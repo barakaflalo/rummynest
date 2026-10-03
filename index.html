@@ -1,0 +1,2469 @@
+<!doctype html>
+<html lang="he" dir="rtl" data-theme="gold" data-mode="night" data-board="felt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RummyNest · ג'ין רמי</title>
+<meta name="description" content="ג'ין רמי מול המחשב, בטלפון אחד או אונליין עם חבר — עם לחץ-ודבר והודעות קוליות. קלפים או אבנים.">
+<meta name="theme-color" content="#0a0a0a">
+<meta property="og:title" content="RummyNest · ג'ין רמי">
+<meta property="og:description" content="ג'ין רמי מול המחשב, בטלפון אחד או אונליין עם חבר — עם לחץ-ודבר והודעות קוליות.">
+<meta property="og:image" content="icon-512.png">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Secular+One&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ---------------- tokens: app theme (data-theme × data-mode) ---------------- */
+:root{
+  --bg:#070707; --panel:#121212; --panel2:#1a1a1a; --line:#2c2a24; --ink:#f3efe4; --muted:#a39d8c;
+  --acc:#d4a940; --acc2:#f0cd6e; --accInk:#140f02; --ok:#46b46e; --bad:#e0584f;
+  --felt1:#1f6b45; --felt2:#0f4029; --feltLine:rgba(255,255,255,.10); --feltInk:#f4f1e6;
+  --cardFace:#fdfbf4; --cardEdge:#cfcac0; --red:#c4262e; --blk:#141414; --s2:#c4262e; --s3:#141414;
+  --back1:#141414; --back2:#d4a940;
+  --tBlk:#1b1b1b; --tRed:#d0202c; --tOra:#e07a10; --tBlu:#1b5fc4; --tile:#f6f0dc; --tileEdge:#d8ceb0;
+  --r:14px; --disp:'Secular One','Rubik',system-ui,sans-serif; --body:'Rubik',system-ui,-apple-system,'Segoe UI',Arial,sans-serif;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+*,*::before,*::after{box-sizing:inherit}
+[data-theme="silver"]{--acc:#c9ced6;--acc2:#eef1f5;--accInk:#0d0f12;--line:#2a2d33;--back2:#c9ced6}
+[data-theme="emerald"]{--acc:#3fbf7f;--acc2:#7fe0ae;--accInk:#03140b;--line:#1f3329;--back2:#3fbf7f}
+[data-theme="ruby"]{--acc:#e0566a;--acc2:#f598a6;--accInk:#1a0408;--line:#3a2328;--back2:#e0566a}
+[data-theme="ocean"]{--acc:#4aa8e8;--acc2:#97d0f6;--accInk:#03111c;--line:#1f2d3a;--back2:#4aa8e8}
+[data-mode="day"]{--bg:#f4f2ec;--panel:#ffffff;--panel2:#f0ede5;--line:#d9d3c4;--ink:#17150f;--muted:#6b6455;--back1:#2a261c}
+[data-mode="day"][data-theme="gold"]{--acc:#a8801c;--acc2:#c99b2c;--accInk:#fff}
+[data-mode="day"][data-theme="silver"]{--acc:#5c6573;--acc2:#7d8796;--accInk:#fff}
+[data-mode="day"][data-theme="emerald"]{--acc:#1f8a55;--acc2:#2ea96b;--accInk:#fff}
+[data-mode="day"][data-theme="ruby"]{--acc:#b8344a;--acc2:#d14d62;--accInk:#fff}
+[data-mode="day"][data-theme="ocean"]{--acc:#1f6fa8;--acc2:#2f8acb;--accInk:#fff}
+/* table colour is its own setting (written after the themes, same specificity → it wins) */
+[data-board="felt"]{--felt1:#1f6b45;--felt2:#0f4029;--feltInk:#f4f1e6;--feltLine:rgba(255,255,255,.10)}
+[data-board="wood"]{--felt1:#8a5a32;--felt2:#5a3519;--feltInk:#fff6e8;--feltLine:rgba(255,235,200,.14)}
+[data-board="blue"]{--felt1:#1d4f7a;--felt2:#0e2a45;--feltInk:#eef5ff;--feltLine:rgba(255,255,255,.10)}
+[data-board="contrast"]{--felt1:#0c0c0c;--felt2:#000;--feltInk:#fff;--feltLine:rgba(255,255,255,.35);--cardEdge:#fff}
+[data-board="theme"]{--felt1:var(--panel2);--felt2:var(--bg);--feltInk:var(--ink);--feltLine:var(--line)}
+[data-four="1"]{--s2:#1b5fc4;--s3:#1d8a3a}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+button{font:inherit;color:inherit}
+.hide{display:none!important}
+.ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+
+/* ---------------- screens ---------------- */
+.scr{display:none;min-height:100vh;min-height:100dvh;animation:scrIn .22s ease}
+.scr.on{display:block}
+@keyframes scrIn{from{opacity:.4;transform:translateY(6px)}to{opacity:1;transform:none}}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-bottom:1px solid var(--line)}
+.bar h2{margin:0;font-family:var(--disp);font-weight:400;font-size:21px;flex:1}
+.back{min-width:48px;height:44px;border-radius:12px;border:1.5px solid var(--acc);background:transparent;color:var(--acc);font-size:22px;font-weight:700;cursor:pointer}
+.wrap{max-width:640px;margin:0 auto;padding:14px 14px 90px}
+.btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:10px 16px;border-radius:12px;border:1.5px solid var(--acc);background:transparent;color:var(--acc);font-weight:500;font-size:16px;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.btn.main{background:var(--acc);color:var(--accInk);font-weight:700}
+.btn.ghosty{border-color:var(--line);color:var(--ink)}
+.btn:disabled{opacity:.38;cursor:default}
+.btn:focus-visible,.back:focus-visible,.pc:focus-visible{outline:3px solid var(--acc2);outline-offset:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>.btn{flex:1}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px}
+.card h3{margin:0 0 8px;font-family:var(--disp);font-weight:400;font-size:19px}
+.muted{color:var(--muted);font-size:14px}
+label.f{display:block;margin:10px 0 4px;font-size:14px;color:var(--muted)}
+input.in,select.in{width:100%;min-height:48px;border-radius:12px;border:1.5px solid var(--line);background:var(--panel2);color:var(--ink);padding:10px 12px;font:inherit;font-size:16px}
+.seg{display:flex;border:1.5px solid var(--line);border-radius:12px;overflow:hidden}
+.seg button{flex:1;min-height:46px;border:0;background:transparent;cursor:pointer;font-size:15px;padding:6px 4px}
+.seg button.on{background:var(--acc);color:var(--accInk);font-weight:700}
+.sw{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);cursor:pointer}
+.sw:first-of-type{border-top:0}
+.sw .t{flex:1}
+.sw .t small{display:block;color:var(--muted);font-size:13px}
+.tg{width:52px;height:30px;border-radius:30px;background:var(--line);position:relative;flex:none;transition:background .15s}
+.tg::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:inset-inline-start .15s}
+.sw.on .tg{background:var(--acc)}
+.sw.on .tg::after{inset-inline-start:25px}
+.swatches{display:flex;gap:10px;flex-wrap:wrap}
+.swatch{width:46px;height:46px;border-radius:50%;border:3px solid transparent;cursor:pointer}
+.swatch.on{border-color:var(--ink)}
+.badge{text-align:center;color:var(--muted);font-size:12px;margin:24px 0 8px}
+
+/* ---------------- home ---------------- */
+.home{max-width:560px;margin:0 auto;padding:16px 16px 40px}
+.htop{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.htop .tools{display:flex;gap:8px}
+.ibtn{width:46px;height:46px;border-radius:12px;border:1.5px solid var(--line);background:var(--panel);font-size:20px;cursor:pointer;display:grid;place-items:center}
+.hero{position:relative;margin:16px 0 18px;padding:22px 18px 18px;border-radius:22px;background:radial-gradient(ellipse at 50% 120%,var(--felt1),var(--felt2) 75%);color:var(--feltInk);overflow:hidden;border:1px solid var(--feltLine)}
+.hero h1{margin:0;font-family:var(--disp);font-weight:400;font-size:36px;line-height:1.05;position:relative}
+.hero p{margin:6px 0 0;opacity:.9;font-size:15px;position:relative;max-width:calc(100% - 128px)}
+.hero{min-height:150px}
+.hero .fan{position:absolute;inset-inline-end:6px;bottom:-26px;height:110px;width:130px;pointer-events:none;opacity:.95}
+.hero .fan .pc{position:absolute;bottom:0;left:50%;transform-origin:50% 120%}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.vcard{border:1.5px solid var(--line);border-radius:16px;padding:12px;background:var(--panel);cursor:pointer;text-align:start;min-height:84px}
+.vcard.on{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+.vcard b{display:block;font-family:var(--disp);font-weight:400;font-size:19px}
+.vcard span{font-size:13px;color:var(--muted)}
+.modes{display:grid;gap:10px}
+.mode{display:flex;align-items:center;gap:14px;min-height:68px;padding:12px 16px;border-radius:16px;border:1.5px solid var(--acc);background:transparent;cursor:pointer;text-align:start}
+.mode .ic{font-size:28px;width:40px;text-align:center}
+.mode b{display:block;font-size:18px}
+.mode span{font-size:13px;color:var(--muted)}
+.mode.main{background:var(--acc);color:var(--accInk)}
+.mode.main span{color:inherit;opacity:.8}
+.minor{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+.minor button{min-height:64px;border-radius:14px;border:1px solid var(--line);background:var(--panel);cursor:pointer;font-size:13px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.minor button i{font-style:normal;font-size:22px}
+.lvls{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+
+/* ---------------- game ---------------- */
+#game{background:radial-gradient(ellipse at 50% 40%,var(--felt1),var(--felt2) 80%);color:var(--feltInk);min-height:100vh;min-height:100dvh}
+#game.on{display:flex;flex-direction:column}
+.gtop{display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(0,0,0,.28)}
+.gtop .back{height:40px;min-width:44px;border-color:var(--feltInk);color:var(--feltInk)}
+.gtop .ttl{flex:1;min-width:0;font-size:14px;line-height:1.2}
+.gtop .ttl b{font-family:var(--disp);font-weight:400;font-size:17px;display:block}
+.score{font-family:var(--disp);font-size:20px;padding:2px 10px;border-radius:10px;background:rgba(0,0,0,.3)}
+.gtop .ibtn{width:40px;height:40px;background:rgba(0,0,0,.25);border-color:var(--feltLine);color:var(--feltInk)}
+.opp{display:flex;align-items:center;gap:10px;padding:8px 10px 4px}
+.opp .who{min-width:0;flex:1}
+.opp .who b{font-size:16px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.opp .who small{font-size:13px;opacity:.85;display:block;min-height:18px}
+.opp .dot{width:10px;height:10px;border-radius:50%;background:#888;flex:none}
+.opp .dot.on{background:#46d07a}.opp .dot.sub{background:#e0b040}
+.opp.turn .who b{color:var(--acc2)}
+.ohand{display:flex;direction:ltr;height:58px;align-items:flex-start;padding:0 10px;justify-content:center}
+.ohand .pc{margin-left:-24px}.ohand .pc:first-child{margin-left:0}
+.known{display:flex;direction:ltr;gap:3px;justify-content:center;min-height:0;padding:0 10px}
+.known .pc{--w:30px}
+.table{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:6px 10px;min-height:190px}
+.piles{display:flex;direction:ltr;gap:26px;align-items:flex-end;justify-content:center}
+.pile{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;border-radius:12px;padding:6px}
+.pile .lab{font-size:13px;opacity:.9}
+.pile.can{animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}50%{box-shadow:0 0 0 4px rgba(255,235,160,.55)}}
+.pile.drop{box-shadow:0 0 0 4px var(--acc2)}
+.stack{position:relative}
+.stack .pc+.pc{position:absolute;left:0;top:0}
+.dpile{position:relative}
+.dpile .under{position:absolute;left:-14px;top:6px;transform:rotate(-8deg);opacity:.9}
+.msg{min-height:26px;text-align:center;font-size:15px;padding:0 8px;font-weight:500}
+.mine{padding:4px 6px 4px}
+.dwline{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:0 6px 4px;font-size:14px}
+.dwline b{font-family:var(--disp);font-weight:400;font-size:18px}
+.chip{padding:3px 10px;border-radius:20px;background:rgba(0,0,0,.3);font-size:13px}
+.chip.go{background:var(--acc);color:var(--accInk);font-weight:700}
+.hand{position:relative;direction:ltr;height:var(--hh,118px);margin:0 auto;touch-action:none}
+.hand .pc{position:absolute;bottom:4px;transition:transform .12s ease,left .18s ease}
+.hand .pc.sel{transform:translateY(-22px)}
+.hand .pc.new{box-shadow:0 0 0 3px var(--acc2),0 4px 10px rgba(0,0,0,.35)}
+.hand .grp{position:absolute;bottom:0;height:4px;border-radius:4px;background:var(--acc2);opacity:.9}
+.hand .pc.dead{filter:saturate(.9)}
+.gbar{display:flex;gap:8px;padding:8px 10px;background:rgba(0,0,0,.28)}
+.gbar .btn{flex:1;min-height:52px;color:var(--feltInk);border-color:var(--feltInk);padding:6px 8px;font-size:15px}
+.gbar .btn.main{background:var(--acc);border-color:var(--acc);color:var(--accInk)}
+.gbar .btn.hot{background:#c0392b;border-color:#c0392b;color:#fff}
+.gbar .btn.sm{flex:0 0 52px}
+.voice{display:flex;gap:8px;padding:0 10px 8px;background:rgba(0,0,0,.28)}
+.voice .btn{flex:1;min-height:46px;color:var(--feltInk);border-color:var(--feltLine);font-size:15px;padding:4px 6px}
+.voice .btn.on{background:#2e8b57;border-color:#2e8b57;color:#fff}
+.voice .btn.rec.on{background:#c0392b;border-color:#c0392b}
+.ptt{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.net{font-size:12px;padding:2px 8px;border-radius:10px;background:rgba(0,0,0,.35)}
+.net.bad{background:#a8322a;color:#fff}
+
+/* ---------------- playing cards (CSS only) ---------------- */
+.pc{--w:58px;width:var(--w);height:calc(var(--w)*1.42);border-radius:calc(var(--w)*.12);background:var(--cardFace);border:1px solid var(--cardEdge);color:var(--blk);position:relative;flex:none;box-shadow:0 2px 5px rgba(0,0,0,.3);font-family:var(--body);user-select:none;-webkit-user-select:none;overflow:hidden}
+.pc.red{color:var(--red)}
+.pc.s2{color:var(--s2)}.pc.s3{color:var(--s3)}
+.pc .ix{position:absolute;top:calc(var(--w)*.05);left:calc(var(--w)*.07);font-weight:700;font-size:calc(var(--w)*.3);line-height:.95;text-align:center;letter-spacing:-.02em}
+.pc .ix s{display:block;text-decoration:none;font-size:calc(var(--w)*.26)}
+.pc .ix.b{top:auto;left:auto;bottom:calc(var(--w)*.05);right:calc(var(--w)*.07);transform:rotate(180deg)}
+.pc .pip{position:absolute;inset:0;display:grid;place-items:center;font-size:calc(var(--w)*.62);padding-top:calc(var(--w)*.1)}
+.pc .face{position:absolute;inset:calc(var(--w)*.22) calc(var(--w)*.18);border:1.5px solid currentColor;border-radius:calc(var(--w)*.08);display:grid;place-items:center;font-family:var(--disp);font-size:calc(var(--w)*.5);opacity:.95}
+.pc.bk{background:repeating-linear-gradient(45deg,var(--back1) 0 5px,color-mix(in srgb,var(--back1) 70%,var(--back2)) 5px 7px);border:2px solid var(--back2)}
+.pc.bk::after{content:"";position:absolute;inset:18%;border:1.5px solid var(--back2);border-radius:40%;opacity:.7}
+/* tiles skin — same ids, drawn as stones */
+[data-skin="tiles"] .pc{background:linear-gradient(180deg,#fffaf0,var(--tile));border:1px solid var(--tileEdge);border-radius:calc(var(--w)*.14);box-shadow:0 3px 0 #b9ad8a,0 4px 8px rgba(0,0,0,.35);height:calc(var(--w)*1.32)}
+[data-skin="tiles"] .pc .ix,[data-skin="tiles"] .pc .pip,[data-skin="tiles"] .pc .face{display:none}
+[data-skin="tiles"] .pc .tn{display:grid}
+.pc .tn{display:none;position:absolute;inset:0;place-items:center;font-family:var(--disp);font-size:calc(var(--w)*.56);padding-bottom:calc(var(--w)*.18)}
+.pc .tn b{position:absolute;top:calc(var(--w)*.04);left:calc(var(--w)*.08);font-family:var(--body);font-weight:700;font-size:calc(var(--w)*.3);line-height:1}
+.pc .tn i{position:absolute;bottom:calc(var(--w)*.13);left:50%;width:calc(var(--w)*.2);height:calc(var(--w)*.2);margin-left:calc(var(--w)*-.1);border-radius:50%;background:currentColor;opacity:.85}
+[data-skin="tiles"] .pc.t0{color:var(--tBlk)}[data-skin="tiles"] .pc.t1{color:var(--tRed)}[data-skin="tiles"] .pc.t2{color:var(--tOra)}[data-skin="tiles"] .pc.t3{color:var(--tBlu)}
+[data-skin="tiles"] .pc.bk{background:linear-gradient(180deg,#fffaf0,var(--tile));border-color:var(--tileEdge)}
+[data-skin="tiles"] .pc.bk::after{inset:30% 30%;border:0;border-radius:50%;background:radial-gradient(circle,var(--back2) 30%,transparent 32%);opacity:.8}
+.pc.mini{--w:30px}
+.pc.lay{box-shadow:0 0 0 3px #5ad08a}
+.pc.dw{box-shadow:0 0 0 2px rgba(224,88,79,.85)}
+
+/* ---------------- overlays ---------------- */
+#ovs .ov{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;padding:12px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));animation:fadeIn .18s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+#ovs .box{width:100%;max-width:560px;max-height:90vh;overflow:auto;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:20px;padding:16px;animation:up .22s ease}
+@keyframes up{from{transform:translateY(24px)}to{transform:none}}
+#ovs .ov.center{align-items:center}
+.ov h3{margin:0 0 6px;font-family:var(--disp);font-weight:400;font-size:24px}
+.res .side{margin:10px 0;padding:10px;border-radius:14px;background:radial-gradient(ellipse at 50% 30%,var(--felt1),var(--felt2));color:var(--feltInk)}
+.res .side .nm{display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px}
+.res .melds{display:flex;flex-wrap:wrap;gap:8px;direction:ltr}
+.res .meld{display:flex;gap:2px;padding:3px;border-radius:8px;background:rgba(0,0,0,.18)}
+.res .meld .pc{--w:32px}
+.res .big{font-family:var(--disp);font-size:28px;text-align:center;margin:6px 0}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl td,.tbl th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:center}
+.tbl th{font-weight:500;color:var(--muted)}
+.pass{position:fixed;inset:0;z-index:60;background:var(--felt2);color:var(--feltInk);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;text-align:center}
+.pass h2{font-family:var(--disp);font-weight:400;font-size:30px;margin:0}
+#toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--panel);color:var(--ink);border:1px solid var(--acc);padding:10px 16px;border-radius:14px;opacity:0;pointer-events:none;transition:.2s;z-index:70;max-width:90vw;text-align:center;font-size:15px}
+#toast.on{opacity:1;transform:translateX(-50%)}
+#bubbles{position:fixed;inset:0;pointer-events:none;z-index:40}
+.bub{position:absolute;max-width:70vw;background:#fff;color:#111;padding:8px 12px;border-radius:16px;font-size:15px;box-shadow:0 4px 14px rgba(0,0,0,.35);animation:bubIn .25s ease}
+.bub small{display:block;font-size:11px;color:#666}
+.bub.emo{background:transparent;box-shadow:none;font-size:46px;padding:0;animation:pop 1.2s ease}
+@keyframes bubIn{from{opacity:0;transform:translateY(8px) scale(.9)}to{opacity:1;transform:none}}
+@keyframes pop{0%{transform:scale(.3)}30%{transform:scale(1.25)}60%{transform:scale(1)}100%{transform:translateY(-14px)}}
+.flyc{position:fixed;z-index:45;pointer-events:none;transition:left .32s ease,top .32s ease,transform .32s ease}
+.emogrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.emogrid button{min-height:52px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);font-size:24px;cursor:pointer}
+.phr{display:grid;gap:8px;margin-top:10px}
+.phr button{min-height:46px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;font-size:15px}
+.vmsg{display:flex;align-items:center;gap:8px}
+.code{font-family:var(--disp);font-size:44px;letter-spacing:.12em;text-align:center;direction:ltr}
+.roster{display:grid;gap:6px;margin:10px 0}
+.roster div{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;background:var(--panel2)}
+.rules h3{font-family:var(--disp);font-weight:400;margin:18px 0 6px}
+.rules p,.rules li{font-size:15px}
+.tut{text-align:center}
+.tut .big{font-size:60px}
+.dots{display:flex;gap:6px;justify-content:center;margin:12px 0}
+.dots i{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.dots i.on{background:var(--acc)}
+.rp{display:flex;flex-direction:column;gap:8px}
+.rp .hrow{display:flex;direction:ltr;flex-wrap:wrap;gap:2px;justify-content:center}
+.rp .hrow .pc{--w:30px}
+@media (orientation:landscape) and (max-height:520px){
+  #game.on{display:grid;grid-template-columns:1fr minmax(240px,32%);grid-template-rows:auto auto auto auto 1fr auto auto}
+  .gtop{grid-column:1/3;grid-row:1}
+  .opp{grid-column:1;grid-row:2;padding-top:4px}
+  .ohand{grid-column:1;grid-row:3;height:40px}
+  .known{grid-column:1;grid-row:4}
+  .table{grid-column:2;grid-row:2/6;min-height:0}
+  .mine{grid-column:1;grid-row:5;align-self:end}
+  .gbar{grid-column:1/3;grid-row:6}
+  .voice{grid-column:1/3;grid-row:7}
+  .ohand .pc{--w:26px!important}
+  .hand .pc.sel{transform:translateY(-14px)}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<!-- HOME -->
+<section class="scr on" id="home">
+  <div class="home">
+    <div class="htop">
+      <div class="tools"><button class="ibtn" id="hTheme" aria-label="theme">🎨</button><button class="ibtn" id="hMode" aria-label="day/night">🌙</button></div>
+      <div class="tools"><button class="ibtn" id="hLang" aria-label="language">🌐</button><button class="ibtn" id="hAbout" aria-label="about">ℹ️</button></div>
+    </div>
+    <div class="hero">
+      <div class="fan" id="heroFan"></div>
+      <h1>RummyNest</h1>
+      <p data-t="tagline"></p>
+    </div>
+    <div class="vgrid" id="vgrid"></div>
+    <div class="modes">
+      <button class="mode main hide" id="mCont"><span class="ic">▶</span><span><b data-t="continue"></b><span id="mContSub"></span></span></button>
+      <button class="mode" id="mCpu"><span class="ic">🤖</span><span><b data-t="vsCpu"></b><span data-t="vsCpuSub"></span></span></button>
+      <button class="mode" id="mTwo"><span class="ic">👥</span><span><b data-t="twoPhone"></b><span data-t="twoPhoneSub"></span></span></button>
+      <button class="mode" id="mOnline"><span class="ic">🌍</span><span><b data-t="online"></b><span data-t="onlineSub"></span></span></button>
+    </div>
+    <div class="minor">
+      <button id="hRules"><i>📖</i><span data-t="rules"></span></button>
+      <button id="hStats"><i>📊</i><span data-t="stats"></span></button>
+      <button id="hReplays"><i>🎞️</i><span data-t="replays"></span></button>
+      <button id="hSettings"><i>⚙️</i><span data-t="settings"></span></button>
+    </div>
+    <div class="badge">AppNest · <span id="verLbl"></span></div>
+  </div>
+</section>
+
+<!-- ONLINE LOBBY -->
+<section class="scr" id="lobby"><div class="bar"><button class="back" data-home></button><h2 data-t="online"></h2></div><div class="wrap" id="lobbyBody"></div></section>
+
+<!-- GAME -->
+<section class="scr" id="game">
+  <div class="gtop">
+    <button class="back" id="gBack"></button>
+    <div class="ttl"><b id="gTitle"></b><span id="gSub"></span></div>
+    <span class="net hide" id="gNet"></span>
+    <span class="score" id="gScore"></span>
+    <button class="ibtn" id="gMenu" aria-label="menu">⋯</button>
+  </div>
+  <div class="opp" id="opp"><span class="dot" id="oDot"></span><div class="who"><b id="oName"></b><small id="oStat"></small></div><span class="chip hide" id="oKnownLbl"></span></div>
+  <div class="ohand" id="oHand"></div>
+  <div class="known" id="oKnown"></div>
+  <div class="table">
+    <div class="piles">
+      <div class="pile" id="pStock" role="button" tabindex="0"><div class="stack" id="stockStack"></div><span class="lab" id="stockLbl"></span></div>
+      <div class="pile" id="pDisc" role="button" tabindex="0"><div class="dpile" id="discStack"></div><span class="lab" id="discLbl"></span></div>
+    </div>
+    <div class="msg" id="gMsg" aria-live="polite"></div>
+  </div>
+  <div class="mine">
+    <div class="dwline"><span><span data-t="deadwood"></span>: <b id="myDw">0</b></span><span class="chip hide" id="canKnock"></span><span class="chip" id="mySort"></span></div>
+    <div class="hand" id="hand"></div>
+  </div>
+  <div class="gbar" id="gbar">
+    <button class="btn sm" id="bHint" aria-label="hint">💡</button>
+    <button class="btn" id="bA"></button>
+    <button class="btn main" id="bB"></button>
+  </div>
+  <div class="voice hide" id="voice">
+    <button class="btn ptt" id="vPtt"></button>
+    <button class="btn" id="vOpen">🔊</button>
+    <button class="btn rec" id="vRec">⏺</button>
+    <button class="btn" id="vEmo">😀</button>
+  </div>
+</section>
+
+<!-- SETTINGS / STATS / REPLAYS / RULES / ABOUT -->
+<section class="scr" id="settings"><div class="bar"><button class="back" data-home></button><h2 data-t="settings"></h2></div><div class="wrap" id="setBody"></div></section>
+<section class="scr" id="stats"><div class="bar"><button class="back" data-home></button><h2 data-t="stats"></h2></div><div class="wrap" id="statBody"></div></section>
+<section class="scr" id="replays"><div class="bar"><button class="back" data-home></button><h2 data-t="replays"></h2></div><div class="wrap" id="repBody"></div></section>
+<section class="scr" id="rules"><div class="bar"><button class="back" data-home></button><h2 data-t="rules"></h2></div><div class="wrap rules" id="rulesBody"></div></section>
+<section class="scr" id="about"><div class="bar"><button class="back" data-home></button><h2 data-t="about"></h2></div><div class="wrap" id="aboutBody"></div></section>
+<div id="ovs"></div>
+<div id="bubbles"></div>
+<div id="toast" role="status"></div>
+<script>
+/* ---- nestlink.js ---- */
+/* =====================================================================
+   NestLink 1.1 — AppNest online multiplayer module (WebRTC via PeerJS)
+   One file, drop into any AppNest game. No server of our own:
+   - a public PeerJS server only introduces the phones; game data, voice
+     and voice messages then travel directly phone-to-phone.
+   - star layout: the host is seat 0 and relays messages between guests,
+     so 2–6 players work; voice is a direct mesh (good up to ~4–5).
+   - every game message is sequenced and re-sent after a reconnect.
+   The game owns the session object (persist it with the game state) and
+   receives events through callbacks. See NESTLINK.md for the API.
+   1.1: sendTo(seat, d) — a private message to one seat only (card games:
+        the host deals each player only their own cards). Compatible with 1.0.
+        Heartbeat: a phone that vanished (app closed, no signal) is marked offline
+        within ~10 s instead of looking connected forever.
+        After a reconnect, if the other side already got more messages than we
+        remember sending (we restored an older saved session), numbering continues
+        after theirs instead of being silently ignored.
+   ===================================================================== */
+const NestLink = (() => {
+  const CDNS = ['https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js'];
+  const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }];
+  const AB = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const genCode = (n = 5) => Array.from({ length: n }, () => AB[Math.floor(Math.random() * AB.length)]).join('');
+  const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  function loadScript(u) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = u; s.onload = res; s.onerror = rej; document.head.appendChild(s); setTimeout(rej, 12000); }); }
+  async function loadPeer() { if (window.Peer) return true; for (const u of CDNS) { try { await loadScript(u); if (window.Peer) return true; } catch (e) {} } return false; }
+  const b64 = buf => { let s = '', a = new Uint8Array(buf); for (let i = 0; i < a.length; i += 0x8000) s += String.fromCharCode.apply(null, a.subarray(i, i + 0x8000)); return btoa(s); };
+  const unb64 = s => { const b = atob(s), a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; };
+
+  function create(opt) {
+    const L = { status: 'off', lastErr: null, peer: null, conns: {}, retry: null, chunks: {}, calls: {}, audio: {}, mic: null, talking: false, openMic: false, rec: null, seen: {}, hb: {}, hbT: null };
+    let S = null;                                         // the session — owned and persisted by the game
+    const ev = (k, ...a) => { try { opt[k] && opt[k](...a); } catch (e) { console.error(e); } };
+    const persist = () => ev('persist', S);
+    const roomId = c => (opt.app || 'nest') + '-v1-' + c.toLowerCase();
+    const max = () => opt.maxPlayers || 2;
+    const isHost = () => S && S.role === 'host';
+    function peerOpts() {
+      const q = new URLSearchParams(location.search), o = { debug: 0, config: { iceServers: opt.iceServers || ICE } };
+      if (q.get('peerhost')) { o.host = q.get('peerhost'); o.port = +(q.get('peerport') || 9000); o.path = '/'; o.secure = false; }   // test servers only
+      return o;
+    }
+    function setStatus(st, err) { L.status = st; if (err !== undefined) L.lastErr = err; ev('onStatus', st, L.lastErr); }
+    const link = seat => S.links[seat] || (S.links[seat] = { seq: 0, lastIn: 0, out: [] });
+    const rosterEntry = seat => S.roster.find(p => p.seat === seat);
+    function rawTo(seat, m) { const c = L.conns[seat]; try { if (c && c.open) c.send(m); } catch (e) {} }
+    function rawAll(m, except) { for (const s in L.conns) if (+s !== except) rawTo(+s, m); }
+
+    /* ---------- starting ---------- */
+    async function start(session) {
+      close(true); S = session; persist();
+      L.hbT = setInterval(beat, 3000);                   // after close(), which clears it
+      setStatus('connecting');
+      if (!(await loadPeer())) { setStatus('error', 'load'); return false; }
+      const peer = L.peer = new Peer(isHost() ? roomId(S.code) : undefined, peerOpts());
+      peer.on('open', id => {
+        S.pid = id; if (isHost()) { const me = rosterEntry(0); if (me) { me.pid = id; me.online = true; } }
+        persist(); setStatus(isHost() ? 'waiting' : 'connecting'); if (!isHost()) connectHost();
+      });
+      peer.on('connection', c => { if (isHost()) attach(c, null); });
+      peer.on('call', onCall);
+      peer.on('disconnected', () => setTimeout(() => { try { if (L.peer === peer && !peer.destroyed) peer.reconnect(); } catch (e) {} }, 1500));
+      peer.on('error', e => {
+        const t = e && e.type;
+        if (t === 'unavailable-id') {                     // room id still held (e.g. after reload) — new code while nobody joined, else retry
+          if (S.roster.length < 2) { S.code = genCode(); persist(); ev('onCode', S.code); }
+          setTimeout(() => start(S), S.roster.length < 2 ? 300 : 4000); return;
+        }
+        if (t === 'peer-unavailable') { setStatus('notfound', 'nf'); scheduleRetry(); return; }
+        if (/network|server-error|socket/.test(t || '')) setStatus('error', 'net');
+      });
+      return true;
+    }
+    function host(code) {
+      return start({ role: 'host', code: code || genCode(), seat: 0, cid: uid(), roster: [{ seat: 0, name: opt.name ? opt.name() : '', online: true, cid: null, voice: false }], links: {} });
+    }
+    function join(code) { return start({ role: 'guest', code: code.toUpperCase(), seat: null, cid: uid(), roster: [], links: {} }); }
+    function resume(session) { return start(session); }
+    function scheduleRetry() { clearTimeout(L.retry); if (S && !isHost() && !(L.conns[0] && L.conns[0].open)) L.retry = setTimeout(connectHost, 3000); }
+    function connectHost() { if (!L.peer || L.peer.destroyed || (L.conns[0] && L.conns[0].open)) return; attach(L.peer.connect(roomId(S.code), { reliable: true, serialization: 'json' }), 0); scheduleRetry(); }
+
+    /* ---------- connections ---------- */
+    function attach(c, seat) {
+      let mySeat = seat;                                  // the seat at the other end of this connection
+      const onOpen = () => {
+        if (!isHost()) { L.conns[0] = c; rawTo(0, { t: 'hi', cid: S.cid, name: opt.name ? opt.name() : '', have: link(0).lastIn, v: opt.version, hb: 1 }); }
+      };
+      if (c.open) onOpen(); else c.on('open', onOpen);
+      c.on('data', m => {
+        if (!m || !m.t) return;
+        const key = isHost() ? mySeat : 0;                // 1.1 heartbeat: remember when we last heard from them
+        if (key != null) L.seen[key] = Date.now();
+        if (m.t === 'ping') { if (key != null) L.hb[key] = 1; return; }
+        if (isHost() && m.t === 'hi') {                   // a guest introduces itself → give it a seat (same seat when it comes back)
+          let p = S.roster.find(x => x.cid === m.cid);
+          if (!p) {
+            if (S.roster.length >= max()) { try { c.send({ t: 'full' }); c.close(); } catch (e) {} return; }
+            let s = 1; while (S.roster.some(x => x.seat === s)) s++;
+            p = { seat: s, cid: m.cid, name: '', online: true, voice: false }; S.roster.push(p); S.roster.sort((a, b) => a.seat - b.seat);
+            ev('onJoin', s);
+          }
+          mySeat = p.seat; p.name = (m.name || '').slice(0, 20); p.online = true; p.pid = c.peer;
+          if ((m.have || 0) > link(mySeat).seq) link(mySeat).seq = m.have;   // 1.1: we restored an older session — keep numbering after what they already got
+          if (L.conns[mySeat] && L.conns[mySeat] !== c) { try { L.conns[mySeat].close(); } catch (e) {} }
+          L.conns[mySeat] = c; L.seen[mySeat] = Date.now(); L.hb[mySeat] = m.hb ? 1 : 0;   // 1.1 phones announce the heartbeat
+          rawTo(mySeat, { t: 'hi', seat: mySeat, have: link(mySeat).lastIn, roster: S.roster, v: opt.version, hb: 1 });
+          link(mySeat).out.filter(x => x.seq > (m.have || 0)).forEach(x => rawTo(mySeat, x));
+          if (m.v && opt.version && m.v.split('.')[0] !== opt.version.split('.')[0]) ev('onVersion', m.v);
+          persist(); broadcastRoster(); setStatus('open'); callEveryone();
+          return;
+        }
+        if (!isHost() && m.t === 'hi') {
+          S.seat = m.seat; S.roster = m.roster || []; L.seen[0] = Date.now(); L.hb[0] = m.hb ? 1 : 0;
+          if ((m.have || 0) > link(0).seq) link(0).seq = m.have;            // 1.1: same protection on the guest side
+          persist();
+          link(0).out.filter(x => x.seq > (m.have || 0)).forEach(x => rawTo(0, x));
+          if (m.v && opt.version && m.v.split('.')[0] !== opt.version.split('.')[0]) ev('onVersion', m.v);
+          clearTimeout(L.retry); setStatus('open'); ev('onRoster', S.roster); callEveryone(); return;
+        }
+        if (m.t === 'full') { setStatus('full', 'full'); close(true); return; }
+        onData(m, isHost() ? mySeat : 0);
+      });
+      const gone = () => {
+        if (isHost()) { if (mySeat == null || L.conns[mySeat] !== c) return; delete L.conns[mySeat]; const p = rosterEntry(mySeat); if (p) p.online = false; persist(); broadcastRoster(); setStatus(Object.keys(L.conns).length ? 'open' : 'waiting'); }
+        else { if (L.conns[0] !== c) return; delete L.conns[0]; setStatus('reconnecting'); scheduleRetry(); }
+        stopAudioFrom(mySeat);
+      };
+      c.on('close', gone); c.on('error', gone);
+    }
+    function broadcastRoster() { if (!isHost()) return; rawAll({ t: 'roster', roster: S.roster }); ev('onRoster', S.roster); }
+
+    /* ---------- messages ---------- */
+    function onData(m, via) {
+      if (m.t === 'roster') { S.roster = m.roster; persist(); ev('onRoster', S.roster); callEveryone(); return; }
+      if (m.t === 'need') { link(via).out.filter(x => x.seq > m.have).forEach(x => rawTo(via, x)); return; }
+      if (m.t === 'emo' || m.t === 'talk' || m.t === 'vm') {
+        if (isHost()) rawAll(m, via);                     // relay to the other guests
+        if (m.t === 'emo') ev('onEmoji', m.e, m.from);
+        else if (m.t === 'talk') { const p = rosterEntry(m.from); if (p) p.talking = m.on; ev('onTalk', m.from, m.on); }
+        else gotChunk(m);
+        return;
+      }
+      if (m.t === 'voice') { const p = rosterEntry(m.from); if (p) p.voice = m.on; if (isHost()) { rawAll(m, via); broadcastRoster(); } callEveryone(); return; }
+      if (m.t !== 'm') return;
+      const lk = link(via);
+      if (m.seq <= lk.lastIn) return;
+      if (m.seq > lk.lastIn + 1) { rawTo(via, { t: 'need', have: lk.lastIn }); return; }
+      lk.lastIn = m.seq; persist();
+      if (isHost() && max() > 2 && !m.p) for (const p of S.roster) if (p.seat !== 0 && p.seat !== m.from) seqTo(p.seat, m.d, m.from);
+      ev('onMessage', m.d, m.from);
+    }
+    function seqTo(seat, d, from, priv) {
+      const lk = link(seat), m = { t: 'm', seq: ++lk.seq, from, d }; if (priv) m.p = 1;
+      lk.out.push(m); if (lk.out.length > 300) lk.out.splice(0, lk.out.length - 300);
+      rawTo(seat, m);
+    }
+    function send(d) {                                    // reliable, ordered, reaches every other player
+      if (!S) return;
+      if (isHost()) { for (const p of S.roster) if (p.seat !== 0) seqTo(p.seat, d, 0); }
+      else seqTo(0, d, S.seat);
+      persist();
+    }
+    function sendTo(seat, d) {                            // private: host → one guest, or guest → host only (not relayed)
+      if (!S || seat === S.seat) return;
+      if (isHost()) { if (S.roster.some(p => p.seat === seat)) seqTo(seat, d, 0, true); }
+      else seqTo(0, d, S.seat, true);
+      persist();
+    }
+    function emoji(e) { if (S) rawAll({ t: 'emo', e, from: S.seat }); }
+    const isOpen = () => !!S && (isHost() ? Object.values(L.conns).some(c => c.open) : !!(L.conns[0] && L.conns[0].open));
+
+    /* ---------- voice: push-to-talk / open mic (direct mesh) ---------- */
+    async function micOn() {
+      if (L.mic) return true;
+      try { L.mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+      catch (e) { ev('onMicError', e && e.name); return false; }
+      L.mic.getAudioTracks().forEach(t => t.enabled = L.openMic);
+      const me = rosterEntry(S.seat); if (me) me.voice = true;
+      const m = { t: 'voice', on: true, from: S.seat }; rawAll(m);
+      callEveryone(); return true;
+    }
+    function callEveryone() {                             // each phone with a mic sends its own one-way audio call to every other phone
+      if (!L.mic || !L.peer || !S) return;
+      for (const p of S.roster) {
+        if (p.seat === S.seat || !p.online || !p.pid) continue;
+        const c = L.calls[p.seat]; if (c && !c._dead) continue;
+        try { const call = L.peer.call(p.pid, L.mic, { metadata: { seat: S.seat } }); L.calls[p.seat] = call; call.on('close', () => { call._dead = true; }); call.on('error', () => { call._dead = true; }); } catch (e) {}
+      }
+    }
+    function onCall(call) {
+      call.answer();                                      // receive only — our own audio goes out on our own call
+      call.on('stream', st => {
+        const seat = call.metadata && call.metadata.seat;
+        let a = L.audio[seat]; if (!a) { a = L.audio[seat] = document.createElement('audio'); a.autoplay = true; a.setAttribute('playsinline', ''); a.style.display = 'none'; document.body.appendChild(a); }
+        a.srcObject = st; const p = a.play(); if (p && p.catch) p.catch(() => ev('onAudioBlocked'));
+      });
+    }
+    function stopAudioFrom(seat) { const a = L.audio[seat]; if (a) { a.srcObject = null; a.remove(); delete L.audio[seat]; } const c = L.calls[seat]; if (c) { try { c.close(); } catch (e) {} delete L.calls[seat]; } }
+    async function talk(on) {
+      if (on && !(await micOn())) return false;
+      if (!L.mic) return false;
+      L.talking = on || L.openMic; L.mic.getAudioTracks().forEach(t => t.enabled = L.talking);
+      rawAll({ t: 'talk', on: L.talking, from: S.seat }); return true;
+    }
+    async function setOpenMic(on) { L.openMic = on; if (on && !(await micOn())) { L.openMic = false; return false; } return talk(on); }
+
+    /* ---------- voice messages ---------- */
+    async function recStart(maxSec) {
+      if (L.rec || !(await micOn())) return false;
+      const track = L.mic.getAudioTracks()[0].clone(); track.enabled = true;
+      const st = new MediaStream([track]), mime = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/webm', 'audio/mp4'].find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+      let r; try { r = new MediaRecorder(st, mime ? { mimeType: mime, audioBitsPerSecond: 24000 } : undefined); } catch (e) { ev('onMicError', 'rec'); return false; }
+      const parts = [], t0 = Date.now();
+      L.rec = { r, track, t0, timer: setTimeout(() => recStop(), (maxSec || 20) * 1000) };
+      r.ondataavailable = e => { if (e.data && e.data.size) parts.push(e.data); };
+      r.onstop = async () => {
+        track.stop();
+        const dur = Math.round((Date.now() - t0) / 100) / 10, blob = new Blob(parts, { type: r.mimeType || mime || 'audio/webm' });
+        if (L.rec && L.rec.cancel || dur < .4 || !blob.size) { L.rec = null; ev('onRecState', false); return; }
+        L.rec = null; ev('onRecState', false);
+        const data = b64(await blob.arrayBuffer()), id = uid(), CH = 12000, n = Math.ceil(data.length / CH);
+        for (let i = 0; i < n; i++) rawAll({ t: 'vm', id, i, n, dur, mime: blob.type, from: S.seat, data: data.slice(i * CH, (i + 1) * CH) });
+        ev('onVoiceMsg', URL.createObjectURL(blob), dur, S.seat, true);
+      };
+      r.start(); ev('onRecState', true, t0); return true;
+    }
+    function recStop(cancel) { if (!L.rec) return; clearTimeout(L.rec.timer); L.rec.cancel = !!cancel; try { L.rec.r.stop(); } catch (e) {} }
+    function gotChunk(m) {
+      const c = L.chunks[m.id] || (L.chunks[m.id] = { parts: [], got: 0, t: Date.now() });
+      if (c.parts[m.i] == null) { c.parts[m.i] = m.data; c.got++; }
+      if (c.got === m.n) { delete L.chunks[m.id]; const blob = new Blob([unb64(c.parts.join(''))], { type: m.mime || 'audio/webm' }); ev('onVoiceMsg', URL.createObjectURL(blob), m.dur, m.from, false); }
+      for (const k in L.chunks) if (Date.now() - L.chunks[k].t > 60000) delete L.chunks[k];
+    }
+
+    /* ---------- 1.1 heartbeat ----------
+       A phone that closes the app or loses signal often never fires 'close'. Every 3 s we ping
+       everyone; a peer that pings (1.1+) but has been silent for 10 s is treated as gone.
+       Peers on 1.0 never ping, so they are never dropped by mistake. */
+    function beat() {
+      if (!S) return;
+      const now = Date.now();
+      for (const k in L.conns) {
+        const s = +k; rawTo(s, { t: 'ping' });
+        if (!L.hb[s] || now - (L.seen[s] || now) < 10000) continue;
+        L.hb[s] = 0; const c = L.conns[s]; delete L.conns[s]; try { c.close(); } catch (e) {}
+        stopAudioFrom(s);
+        if (isHost()) { const p = rosterEntry(s); if (p) p.online = false; persist(); broadcastRoster(); setStatus(Object.keys(L.conns).length ? 'open' : 'waiting'); }
+        else { setStatus('reconnecting'); scheduleRetry(); }
+      }
+    }
+
+    /* ---------- closing ---------- */
+    function close(keepSession) {
+      clearTimeout(L.retry); clearInterval(L.hbT); L.hbT = null;
+      Object.keys(L.audio).forEach(s => stopAudioFrom(+s));
+      for (const s in L.conns) { try { L.conns[s].close(); } catch (e) {} }
+      L.conns = {};
+      if (L.mic) { L.mic.getTracks().forEach(t => t.stop()); L.mic = null; }
+      L.calls = {}; L.talking = false;
+      try { if (L.peer) L.peer.destroy(); } catch (e) {}
+      L.peer = null; if (!keepSession) S = null; setStatus('off');
+    }
+
+    return {
+      host, join, resume, close, send, sendTo, emoji, isOpen, talk, setOpenMic, recStart, recStop,
+      get status() { return L.status; }, get error() { return L.lastErr; }, get session() { return S; },
+      get seat() { return S ? S.seat : null; }, get roster() { return S ? S.roster : []; },
+      get micReady() { return !!L.mic; }, get talking() { return L.talking; }, get openMic() { return L.openMic; }, get recording() { return !!L.rec; },
+      inviteURL: () => location.origin + location.pathname + '?join=' + (S ? S.code : ''),
+      _L: L
+    };
+  }
+  return { create, genCode, loadPeer };
+})();
+
+/* ---- engine.js ---- */
+/* =====================================================================
+   RummyNest — engine (pure JS, no DOM). Runs in the browser and in Node.
+   RC  = shared rummy core: cards/tiles, melds, deadwood, seeded RNG.
+   GIN = Gin Rummy rules engine (2 players) + computer opponent.
+   Card id 0..51: suit = floor(id/13) (0♠ 1♥ 2♦ 3♣), rank = id%13+1 (A=1 … K=13).
+   The same id is drawn as a card or as a tile — the rules never care.
+   ===================================================================== */
+const RC = (() => {
+  const rank = c => (c % 52) % 13 + 1, suit = c => Math.floor((c % 52) / 13);
+  const val = c => Math.min(10, rank(c));                      // deadwood value
+  function rng(seed) {                                         // mulberry32 — same seed → same shuffle (replays)
+    let a = seed >>> 0;
+    return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  }
+  function shuffle(arr, r) { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+  const newSeed = () => (Math.random() * 4294967296) >>> 0;
+
+  /* every meld (set or run) that can be built from these cards */
+  function meldsOf(cards) {
+    const out = [], byR = {}, byS = [[], [], [], []];
+    for (const c of cards) { (byR[rank(c)] = byR[rank(c)] || []).push(c); byS[suit(c)].push(c); }
+    for (const r in byR) {
+      const g = byR[r];
+      if (g.length >= 3) { out.push(g.slice()); if (g.length === 4) for (let i = 0; i < 4; i++) out.push(g.filter((_, j) => j !== i)); }
+    }
+    for (const s of byS) {
+      if (s.length < 3) continue;
+      s.sort((a, b) => rank(a) - rank(b));
+      let st = 0;
+      for (let i = 1; i <= s.length; i++) {
+        if (i < s.length && rank(s[i]) === rank(s[i - 1]) + 1) continue;
+        const seg = s.slice(st, i);                             // a maximal run of consecutive ranks
+        for (let a = 0; a < seg.length; a++) for (let b = a + 3; b <= seg.length; b++) out.push(seg.slice(a, b));
+        st = i;
+      }
+    }
+    return out;
+  }
+  const isSet = m => m.length >= 3 && m.every(c => rank(c) === rank(m[0]));
+  const isRun = m => { if (m.length < 3) return false; const s = m.map(rank).sort((a, b) => a - b); return m.every(c => suit(c) === suit(m[0])) && s.every((r, i) => i === 0 || r === s[i - 1] + 1); };
+
+  /* lowest deadwood arrangement (exact, memoised over the hand's subsets) */
+  function best(cards) {
+    const n = cards.length, idx = new Map(cards.map((c, i) => [c, i]));
+    const melds = meldsOf(cards).map(m => ({ m, mask: m.reduce((s, c) => s | (1 << idx.get(c)), 0) }));
+    const by = Array.from({ length: n }, () => []);
+    melds.forEach(x => { for (let i = 0; i < n; i++) if (x.mask & (1 << i)) { by[i].push(x); break; } });   // indexed by lowest card
+    const memo = new Map();
+    function go(mask) {
+      if (mask === (1 << n) - 1) return 0;
+      if (memo.has(mask)) return memo.get(mask).v;
+      let i = 0; while (mask & (1 << i)) i++;
+      let bv = val(cards[i]) + go(mask | (1 << i)), bc = null;
+      for (let k = 0; k <= i; k++) for (const x of by[k]) {
+        if (!(x.mask & (1 << i)) || (x.mask & mask)) continue;
+        const v = go(mask | x.mask); if (v < bv) { bv = v; bc = x; }
+      }
+      memo.set(mask, { v: bv, c: bc }); return bv;
+    }
+    const dw = go(0), out = [], dead = []; let mask = 0;
+    while (mask !== (1 << n) - 1) {
+      let i = 0; while (mask & (1 << i)) i++;
+      const e = memo.get(mask); if (e && e.c) { out.push(e.c.m.slice()); mask |= e.c.mask; } else { dead.push(cards[i]); mask |= 1 << i; }
+    }
+    return { dw, melds: out, dead };
+  }
+
+  /* every arrangement (each card: in one meld or deadwood) — small hands only */
+  function allArr(cards, limit) {
+    const n = cards.length, idx = new Map(cards.map((c, i) => [c, i]));
+    const melds = meldsOf(cards).map(m => ({ m, mask: m.reduce((s, c) => s | (1 << idx.get(c)), 0) }));
+    const res = [], cur = [], full = (1 << n) - 1;
+    (function go(mask, dw) {
+      if (limit != null && dw > limit) return;
+      if (res.length > 4000) return;
+      if (mask === full) { const dead = cards.filter((c, i) => !cur.some(x => x.mask & (1 << i))); res.push({ melds: cur.map(x => x.m.slice()), dead, dw }); return; }
+      let i = 0; while (mask & (1 << i)) i++;
+      go(mask | (1 << i), dw + val(cards[i]));
+      for (const x of melds) if ((x.mask & (1 << i)) && !(x.mask & mask)) { cur.push(x); go(mask | x.mask, dw); cur.pop(); }
+    })(0, 0);
+    return res;
+  }
+
+  /* laying off loose cards onto the knocker's melds (repeats until nothing fits) */
+  function layoff(melds, loose) {
+    const ms = melds.map(m => m.slice()), rest = loose.slice(), laid = [];
+    let moved = true;
+    while (moved) {
+      moved = false;
+      for (let i = 0; i < rest.length; i++) {
+        const c = rest[i];
+        const mi = ms.findIndex(m => isSet(m) ? (m.length < 4 && rank(c) === rank(m[0])) : (suit(c) === suit(m[0]) && (rank(c) === Math.min(...m.map(rank)) - 1 || rank(c) === Math.max(...m.map(rank)) + 1)));
+        if (mi >= 0) { ms[mi].push(c); laid.push({ c, mi }); rest.splice(i, 1); i--; moved = true; }
+      }
+    }
+    return { laid, rest, melds: ms };
+  }
+  return { rank, suit, val, rng, shuffle, newSeed, meldsOf, best, allArr, layoff, isSet, isRun };
+})();
+
+/* =====================================================================
+   GIN RUMMY
+   ===================================================================== */
+const GIN = (() => {
+  const { rank, suit, val } = RC;
+  const KNOCK = 10, GIN_BONUS = 25, BIG_GIN_BONUS = 31, UNDERCUT_BONUS = 25, GAME_BONUS = 100, BOX_BONUS = 25;
+  const sum = a => a.reduce((s, c) => s + val(c), 0);
+
+  function newMatch(o) {
+    o = o || {};
+    const M = {
+      g: 'gin', v: 1, target: o.target || 100, bonuses: o.bonuses !== false, bigGin: !!o.bigGin,
+      names: o.names || ['', ''], scores: [0, 0], boxes: [0, 0], handNo: 0, dealer: o.dealer != null ? o.dealer : 1,
+      seed: o.seed != null ? o.seed : RC.newSeed(), hist: [], over: false, winner: null, final: null, H: null
+    };
+    deal(M); return M;
+  }
+  function deal(M) {
+    const seed = (M.seed + M.handNo * 7919) >>> 0, r = RC.rng(seed);
+    const deck = RC.shuffle(Array.from({ length: 52 }, (_, i) => i), r);
+    const H = { seed, dealer: M.dealer, hands: [[], []], stock: deck, discard: [], turn: 1 - M.dealer, phase: 'first', passes: 0, noTake: false, took: null, known: [[], []], log: [], res: null, turns: 0 };
+    for (let i = 0; i < 10; i++) { H.hands[1 - M.dealer].push(deck.pop()); H.hands[M.dealer].push(deck.pop()); }
+    H.discard.push(deck.pop()); H.up = H.discard[0];
+    M.H = H; M.handNo++; return H;
+  }
+  const top = H => H.discard[H.discard.length - 1];
+
+  /* can this seat do this now? (used by the host to validate a guest's intent) */
+  function legal(M, s, a) {
+    const H = M.H; if (!H || M.over || H.phase === 'end' || H.turn !== s || !a) return false;
+    const hand = H.hands[s];
+    switch (a.a) {
+      case 'take': return (H.phase === 'first' || (H.phase === 'draw' && !H.noTake)) && H.discard.length > 0;
+      case 'pass': return H.phase === 'first';
+      case 'draw': return H.phase === 'draw' && H.stock.length > 0;
+      case 'discard': return H.phase === 'disc' && hand.includes(a.c) && a.c !== H.took;
+      case 'knock': return H.phase === 'disc' && hand.includes(a.c) && a.c !== H.took && RC.best(hand.filter(x => x !== a.c)).dw <= KNOCK;
+      case 'biggin': return H.phase === 'disc' && M.bigGin && hand.length === 11 && RC.best(hand).dw === 0;
+    }
+    return false;
+  }
+  function apply(M, s, a) {
+    if (!legal(M, s, a)) return false;
+    const H = M.H, hand = H.hands[s];
+    H.log.push([s, a.a, a.a === 'draw' || a.a === 'pass' ? null : (a.a === 'take' ? top(H) : a.c)]);
+    if (a.a === 'take') { const c = H.discard.pop(); hand.push(c); H.known[s].push(c); H.took = c; H.phase = 'disc'; H.noTake = false; }
+    else if (a.a === 'pass') {
+      H.passes++;
+      if (H.passes === 1) H.turn = H.dealer;
+      else { H.turn = 1 - H.dealer; H.phase = 'draw'; H.noTake = true; }
+    }
+    else if (a.a === 'draw') { hand.push(H.stock.pop()); H.took = null; H.phase = 'disc'; H.noTake = false; }
+    else if (a.a === 'discard') {
+      hand.splice(hand.indexOf(a.c), 1); H.discard.push(a.c); H.known[s] = H.known[s].filter(x => x !== a.c);
+      H.took = null; H.turns++;
+      if (H.stock.length <= 2) endHand(M, { type: 'draw' });
+      else { H.turn = 1 - s; H.phase = 'draw'; }
+    }
+    else if (a.a === 'knock') {
+      hand.splice(hand.indexOf(a.c), 1); H.discard.push(a.c); H.known[s] = H.known[s].filter(x => x !== a.c); H.turns++;
+      endHand(M, resolve(H.hands[s], H.hands[1 - s], s, RC.best(hand).dw === 0 ? 'gin' : 'knock'));
+    }
+    else if (a.a === 'biggin') endHand(M, resolve(hand, H.hands[1 - s], s, 'biggin'));
+    return true;
+  }
+
+  /* scoring a knock / gin — knocker picks the meld layout that is best for them,
+     defender then picks melds + lay-offs that are best for them */
+  function defend(dCards, kMelds, allowLayoff) {
+    if (!allowLayoff) { const b = RC.best(dCards); return { melds: b.melds, dead: b.dead, laid: [], dw: b.dw }; }
+    let bestR = null;
+    for (const arr of RC.allArr(dCards)) {
+      const L = RC.layoff(kMelds, arr.dead), dw = sum(L.rest);
+      if (!bestR || dw < bestR.dw) bestR = { melds: arr.melds, dead: L.rest, laid: L.laid, dw };
+      if (bestR.dw === 0) break;
+    }
+    return bestR;
+  }
+  function resolve(kCards, dCards, by, type) {
+    let kArr, D;
+    if (type !== 'knock') { kArr = RC.best(kCards); D = defend(dCards, kArr.melds, false); }
+    else {
+      let bestNet = -1e9;
+      for (const arr of RC.allArr(kCards, KNOCK)) {
+        const d = defend(dCards, arr.melds, true), net = d.dw - arr.dw;
+        if (net > bestNet || (net === bestNet && arr.dw < kArr.dw)) { bestNet = net; kArr = arr; D = d; }
+      }
+    }
+    const kDW = kArr.dw, res = { type, by, kMelds: kArr.melds, kDead: kArr.dead, kDW, dMelds: D.melds, dDead: D.dead, dDW: D.dw, laid: D.laid, undercut: false };
+    if (type === 'gin') { res.winner = by; res.pts = GIN_BONUS + D.dw; }
+    else if (type === 'biggin') { res.winner = by; res.pts = BIG_GIN_BONUS + D.dw; }
+    else if (D.dw <= kDW) { res.winner = 1 - by; res.undercut = true; res.pts = kDW - D.dw + UNDERCUT_BONUS; }
+    else { res.winner = by; res.pts = D.dw - kDW; }
+    return res;
+  }
+  function endHand(M, res) {
+    const H = M.H; H.phase = 'end'; H.res = res;
+    if (res.type !== 'draw') { M.scores[res.winner] += res.pts; M.boxes[res.winner]++; M.dealer = res.winner; }
+    M.hist.push({ n: M.handNo, type: res.type, by: res.by, winner: res.winner, pts: res.pts || 0, undercut: !!res.undercut, seed: H.seed, dealer: H.dealer, log: H.log.slice() });
+    const w = M.scores[0] >= M.target ? 0 : M.scores[1] >= M.target ? 1 : null;
+    if (w != null) {
+      M.over = true; M.winner = w;
+      const tot = M.scores.slice(), f = { scores: M.scores.slice(), game: [0, 0], box: [0, 0], shutout: false };
+      if (M.bonuses) {
+        f.game[w] = GAME_BONUS; f.box = M.boxes.map(b => b * BOX_BONUS);
+        for (let i = 0; i < 2; i++) tot[i] += f.game[i] + f.box[i];
+        if (M.scores[1 - w] === 0) { f.shutout = true; tot[w] *= 2; }
+      }
+      f.total = tot; M.final = f;
+    }
+  }
+  function nextHand(M) { if (M.over || !M.H || M.H.phase !== 'end') return false; deal(M); return true; }
+
+  /* what one seat is allowed to know (also exactly what the computer and the hint see) */
+  function view(M, s) {
+    const H = M.H, o = 1 - s, end = H.phase === 'end';
+    return {
+      g: 'gin', seat: s, names: M.names, scores: M.scores, boxes: M.boxes, target: M.target, bonuses: M.bonuses, bigGin: M.bigGin,
+      handNo: M.handNo, dealer: H.dealer, turn: H.turn, phase: H.phase, noTake: H.noTake, passes: H.passes, took: H.turn === s ? H.took : null,
+      hand: H.hands[s].slice(), oppCount: H.hands[o].length, oppHand: end ? H.hands[o].slice() : null,
+      discard: H.discard.slice(), up: H.up, stockCount: H.stock.length, known: [H.known[0].slice(), H.known[1].slice()],
+      log: H.log.map(e => e.slice()), res: H.res, turns: H.turns, over: M.over, winner: M.winner, final: M.final,
+      hist: M.hist.map(h => ({ n: h.n, type: h.type, by: h.by, winner: h.winner, pts: h.pts, undercut: h.undercut }))
+    };
+  }
+
+  /* ===================================================================
+     COMPUTER OPPONENT — decides only from view(M, seat)
+     levels: 0 easy · 1 medium · 2 hard · 3 expert · 'human' (test bot)
+     =================================================================== */
+  const LV = {
+    0: { noise: .35, pot: 0, danger: 0, takeTau: 1, knock: 'asap' },
+    1: { noise: .08, pot: .5, danger: 0, takeTau: 1, knock: 'asap' },
+    2: { noise: 0, pot: .75, danger: 2, takeTau: .5, knock: 'asap' },
+    3: { noise: 0, pot: .75, danger: 2, takeTau: .5, knock: 'stage', st: [8, 14, 4, 2] },
+    human: { noise: 0, pot: .6, danger: 1.0, takeTau: 1, knock: 'asap', human: true }
+  };
+  function ctxOf(v) {
+    const s = v.seat, o = 1 - s, seen = new Set([...v.hand, ...v.discard, ...v.known[o]]);
+    const unseen = []; for (let c = 0; c < 52; c++) if (!seen.has(c)) unseen.push(c);
+    // what the opponent did with the discards: picked (wants) / threw (doesn't want) / passed on (doesn't want much)
+    const oppPicked = v.known[o], oppThrew = [], oppPassed = [], pile = v.up != null ? [v.up] : [];
+    for (const [who, act, c] of v.log) {
+      if (act === 'discard' || act === 'knock') { if (who === o) oppThrew.push(c); pile.push(c); }
+      else if (act === 'take') pile.pop();
+      else if ((act === 'pass' || act === 'draw') && who === o && pile.length) oppPassed.push(pile[pile.length - 1]);
+    }
+    return { unseen, oppPicked, oppThrew, oppPassed, oppCount: v.oppCount, stock: v.stockCount };
+  }
+  /* rough future value of a 10-card hand: deadwood minus what the next draws are likely to fix */
+  function evalHand(hand, ctx, L) {
+    const b = RC.best(hand); if (!L.pot) return { score: b.dw, b };
+    const dead = b.dead, maxDead = dead.length ? Math.max(...dead.map(val)) : 0;
+    let gain = 0;
+    for (const u of ctx.unseen) {
+      const ru = rank(u), su = suit(u); let g = 0;
+      for (const m of b.melds) {
+        if (RC.isSet(m) ? (m.length === 3 && rank(m[0]) === ru) : (suit(m[0]) === su && (ru === Math.min(...m.map(rank)) - 1 || ru === Math.max(...m.map(rank)) + 1))) { g = Math.max(g, maxDead); break; }
+      }
+      const sameR = dead.filter(c => rank(c) === ru);
+      if (sameR.length >= 2) g = Math.max(g, sum(sameR.slice(0, 2)) + maxDead * .5);
+      const ss = dead.filter(c => suit(c) === su).map(rank);
+      for (let i = 0; i < ss.length; i++) for (let j = i + 1; j < ss.length; j++) {
+        const lo = Math.min(ss[i], ss[j]), hi = Math.max(ss[i], ss[j]);
+        if ((hi - lo === 1 && (ru === lo - 1 || ru === hi + 1)) || (hi - lo === 2 && ru === lo + 1)) g = Math.max(g, Math.min(10, lo) + Math.min(10, hi) + maxDead * .5);
+      }
+      gain += g;
+    }
+    const draws = Math.max(1, Math.min(4, ctx.stock / 4));
+    return { score: b.dw - L.pot * draws * gain / Math.max(8, ctx.unseen.length + ctx.oppCount), b };
+  }
+  /* how likely the opponent can use this card (in deadwood points) */
+  function danger(c, ctx) {
+    const rc = rank(c), sc = suit(c); let d = 0;
+    for (const k of ctx.oppPicked) {
+      if (rank(k) === rc) d += 1.2;
+      else if (suit(k) === sc && Math.abs(rank(k) - rc) <= 2) d += Math.abs(rank(k) - rc) === 1 ? 1.1 : .7;
+    }
+    for (const k of ctx.oppThrew) {
+      if (rank(k) === rc) d -= .5;
+      else if (suit(k) === sc && Math.abs(rank(k) - rc) === 1) d -= .3;
+    }
+    for (const k of ctx.oppPassed) if (rank(k) === rc || (suit(k) === sc && Math.abs(rank(k) - rc) === 1)) d -= .2;
+    let nb = 0; for (const u of ctx.unseen) if (rank(u) === rc || (suit(u) === sc && Math.abs(rank(u) - rc) <= 2)) nb++;
+    d += nb * .08;
+    return Math.max(-.5, d) * (val(c) / 10 + .5);
+  }
+  function chooseDiscard(hand11, took, ctx, L, r) {
+    const opts = [];
+    for (const c of hand11) {
+      if (c === took) continue;
+      const rest = hand11.filter(x => x !== c), e = evalHand(rest, ctx, L);
+      opts.push({ c, s: e.score + L.danger * danger(c, ctx) - (L.human ? 0 : 0), dw: e.b.dw });
+    }
+    opts.sort((a, b) => a.s - b.s);
+    if (L.noise && r() < L.noise) {                              // weaker levels: sometimes a plausible but worse throw
+      const pool = opts.slice(0, Math.min(4, opts.length)); return pool[Math.floor(r() * pool.length)];
+    }
+    return opts[0];
+  }
+  /* knock now? */
+  function wantKnock(dw, hand10, v, ctx, L, r) {
+    if (dw > KNOCK) return false;
+    if (dw === 0) return true;
+    if (L.knock === 'asap') return true;
+    const late = v.turns;                                        // turns already played this hand (both players)
+    if (L.knock === 'stage') { const t = L.st || [8, 14, 7, 4]; return dw <= (late < t[0] ? 10 : late < t[1] ? t[2] : t[3]); }
+    // 'mc' — sample the opponent's hand and estimate the knock's value against an undercut
+    const b = RC.best(hand10), o = 1 - v.seat, known = v.known[o], nUnk = v.oppCount - known.length;
+    let tot = 0, under = 0; const N = L.mc;
+    for (let i = 0; i < N; i++) {
+      const pool = ctx.unseen.slice(); RC.shuffle(pool, r);
+      // opponents keep useful cards: draw a few extra and keep the best 10
+      const cand = known.concat(pool.slice(0, nUnk + Math.min(4, Math.floor(late / 3))));
+      let opp = cand; if (cand.length > 10) { opp = cand.slice(); while (opp.length > 10) { let bi = 0, bv = 1e9; for (let j = known.length; j < opp.length; j++) { const d = RC.best(opp.filter((_, k) => k !== j)).dw; if (d < bv) { bv = d; bi = j; } } opp.splice(bi, 1); } }
+      let dd = 1e9; for (const arr of RC.allArr(opp)) { const Ly = RC.layoff(b.melds, arr.dead), x = sum(Ly.rest); if (x < dd) dd = x; if (dd === 0) break; }
+      if (dd <= dw) { under++; tot -= dw - dd + UNDERCUT_BONUS; } else tot += dd - dw;
+    }
+    const ev = tot / N;
+    return ev > (late < 6 ? 2 : 6) && under / N < .35;
+  }
+  function act(v, level, r) {
+    r = r || Math.random; const L = LV[level] || LV[1], ctx = ctxOf(v), hand = v.hand, tp = v.discard[v.discard.length - 1];
+    if (v.phase === 'first' || v.phase === 'draw') {
+      if (tp != null && (v.phase === 'first' || !v.noTake)) {
+        const now = evalHand(hand, ctx, L), b0 = now.b.dw;
+        const h11 = hand.concat([tp]), pick = chooseDiscard(h11, tp, ctx, Object.assign({}, L, { noise: 0 }), r);
+        const after = evalHand(h11.filter(x => x !== pick.c), ctx, L);
+        const formsMeld = after.b.dw < b0 - val(tp) * 0 && after.b.melds.some(m => m.includes(tp));
+        let take;
+        if (level === 0) take = formsMeld && after.b.dw < b0;
+        else take = (formsMeld && after.b.dw <= b0 - L.takeTau) || (!L.human && L.pot && after.score < now.score - 4 && after.b.dw <= b0);
+        if (take) return { a: 'take' };
+      }
+      return v.phase === 'first' ? { a: 'pass' } : { a: 'draw' };
+    }
+    if (v.phase === 'disc') {
+      if (v.bigGin && hand.length === 11 && RC.best(hand).dw === 0) return { a: 'biggin' };
+      const pick = chooseDiscard(hand, v.took, ctx, L, r);
+      // could a different throw allow a knock / gin? (prefer gin, then the lowest deadwood)
+      let kb = null;
+      for (const c of hand) { if (c === v.took) continue; const d = RC.best(hand.filter(x => x !== c)).dw; if (!kb || d < kb.dw || (d === kb.dw && val(c) > val(kb.c))) kb = { c, dw: d }; }
+      if (kb && kb.dw <= KNOCK && wantKnock(kb.dw, hand.filter(x => x !== kb.c), v, ctx, L, r)) return { a: 'knock', c: kb.c };
+      return { a: 'discard', c: pick.c };
+    }
+    return null;
+  }
+  return { newMatch, deal, nextHand, legal, apply, view, act, resolve, KNOCK, LV, top: M => top(M.H) };
+})();
+
+
+
+const LANG = {};
+/* ---- i18n/he.js ---- */
+LANG.he = {
+tagline:"ג'ין רמי מול המחשב, בטלפון אחד או אונליין עם חבר. קלפים או אבנים.",
+gin:"ג'ין רמי", ginSub:"2 שחקנים · 10 קלפים · דפיקה או ג'ין",
+continue:"המשך משחק", vsCpu:"נגד המחשב", vsCpuSub:"ארבע רמות, מקל ועד מומחה",
+twoPhone:"שניים בטלפון אחד", twoPhoneSub:"מעבירים את הטלפון בין התורות",
+online:"אונליין עם חבר", onlineSub:"קוד חדר, הזמנה בוואטסאפ, דיבור",
+rules:"חוקים", stats:"סטטיסטיקה", replays:"ריפליי", settings:"הגדרות", about:"אודות",
+you:"את/ה", opponent:"היריב", computer:"המחשב", player:"שחקן", friend:"חבר", player1:"שחקן 1", player2:"שחקן 2",
+lvEasy:"קל", lvMed:"בינוני", lvHard:"קשה", lvExpert:"מומחה",
+chooseLevel:"בחר רמה", levelNote:"כל רמה נמדדה מול הרמה שמתחתיה ב-1,000 משחקים. המומחה כמעט לא דופק מוקדם — הוא מחכה לחתוך אותך.",
+change:"שינוי", replaceQ:"להתחיל משחק חדש? המשחק הנוכחי יימחק.", newGame:"משחק חדש",
+deadwood:"דדווד", stock:"קופה", discardPile:"ערימה",
+handN:"יד {0}", toN:"עד {0}", thinking:"חושב…", theirTurn:"התור שלו", theyTook:"לקח מהערימה:",
+cpuTurn:"המחשב משחק…", waitFor:"מחכים ל{0}…", waitingHost:"מחכים למארח…",
+firstMsg:"קח את הקלף הפתוח, או ותר", firstMsg2:"{0} ויתר — קח את הקלף הפתוח, או ותר גם אתה",
+drawMsg:"קח קלף — מהקופה או מהערימה", mustDraw:"שניכם ויתרתם — קח מהקופה",
+discMsg:"בחר קלף לזריקה", ifThrow:"אם תזרוק {0}: דדווד {1}", noThrowBack:"אי אפשר לזרוק בחזרה את הקלף שלקחת עכשיו",
+pass:"ותר", takeX:"קח {0}", fromStock:"מהקופה", knock:"דפוק", knockN:"דפוק · {0}", goGin:"ג'ין!", sure:"בטוח? הקש שוב",
+throw:"זרוק", throwX:"זרוק {0}", canKnock:"אפשר לדפוק", ginPossible:"ג'ין אפשרי!",
+tookX:"לקח {0}", drewStock:"לקח מהקופה", passed:"ויתר", threwX:"זרק {0}", knocked:"דפק", dealt:"חלוקה",
+nextHand:"יד הבאה", matchOver:"תוצאה סופית", scores:"טבלת ניקוד", ready:"מוכן", viewTable:"לראות את השולחן",
+rDraw:"תיקו — הקופה נגמרה", rGin:"ג'ין!", rBigGin:"ביג ג'ין!", rKnock:"דפיקה", rUndercut:"חתך!",
+drawExpl:"נשארו בקופה רק שני קלפים ואף אחד לא דפק. אין נקודות ביד הזו, ואותו מחלק מחלק שוב.",
+calcGin:"25 בונוס ג'ין + {0} דדווד", calcBigGin:"31 בונוס ביג ג'ין + {0} דדווד", calcUnder:"{0} − {1} + 25 בונוס חתך", calcKnock:"{0} − {1} דדווד",
+ginLbl:"ג'ין", laidOff:"הניח {0}", scoreLine:"ניקוד:", total:"סה״כ", withBonuses:"עם בונוסים", noBonuses:"בלי בונוסים",
+knockS:"דפיקה", undercutS:"חתך", ginS:"ג'ין",
+winsX:"{0} ניצח", youWon:"ניצחת במשחק!", youLost:"הפסדת במשחק",
+points:"נקודות", gameBonus:"בונוס משחק", boxBonus:"בונוס לכל יד שנוצחה", shutout:"שאט-אאוט — הניקוד של המנצח מוכפל",
+hintsUsed:"רמזים: {0}", home:"לבית", rematch:"משחק חוזר", close:"סגור", menu:"תפריט",
+sortBy:"סידור", sort_melds:"לפי סדרות", sort_suit:"לפי צורה", sort_rank:"לפי מספר",
+useCards:"לשחק בקלפים", useTiles:"לשחק באבנים", soundOff:"כבה צליל", soundOn:"הפעל צליל", bigTable:"שולחן ענק (לרוחב)", bigTableNo:"מסך מלא לא זמין כאן — סובב את הטלפון לרוחב",
+quitMatch:"לפרוש מהמשחק", quitQ:"לפרוש מהמשחק? הוא לא ייספר.",
+passTo:"העבר את הטלפון ל{0}", passHint:"בלי להציץ בקלפים של השני 🙂", imX:"אני {0} — הצג את הקלפים",
+hTake:"קח את {0} — הוא עוזר ליד שלך.", hPass:"ותר על {0} — הוא לא עוזר לך.", hDraw:"קח מהקופה — הקלף בערימה לא יעזור לך.",
+hThrow:"זרוק את {0}.", hKnock:"דפוק וזרוק את {0} — הדדווד שלך יהיה {1}.", hGin:"זרוק את {0} — ג'ין!", hBigGin:"כל 11 הקלפים בסדרות — ביג ג'ין!",
+hWait:"אפשר לדפוק עם {0}, אבל בשלב הזה המומחה היה מחכה — יש סיכוי טוב לחתך.",
+cards:"קלפים", tiles:"אבנים", tBlack:"שחור", tRed:"אדום", tOrange:"כתום", tBlue:"כחול",
+profile:"פרופיל", yourName:"השם שלך", language:"שפה", look:"מראה", theme:"ערכת צבע", dayNight:"יום / לילה", day:"יום", night:"לילה",
+tableColor:"שולחן", bFelt:"לבד", bWood:"עץ", bBlue:"כחול", bContrast:"ניגודיות", bTheme:"כמו הערכה", pieces:"משחקים עם",
+fourColor:"ארבעה צבעים לצורות", fourColorSub:"♦ כחול ו-♣ ירוק — קל יותר לראות רצפים",
+play:"משחק", oneTap:"הקשה כפולה זורקת", oneTapSub:"הקשה שנייה על הקלף שבחרת זורקת אותו",
+memoryAid:"להראות מה היריב לקח", memoryAidSub:"קלפים שנלקחו מהערימה גלויים לכולם — מוצגים ליד היריב",
+sound:"צליל", vibration:"רטט", gameRules:"חוקי המשחק", rulesForNew:"למשחקים חדשים.", target:"משחקים עד",
+bonuses:"בונוסים בסוף", bonusesSub:"+100 על המשחק, +25 לכל יד שנוצחה, כפול בשאט-אאוט",
+bigGin:"ביג ג'ין", bigGinSub:"כל 11 הקלפים בסדרות מיד אחרי שלקחת: בונוס 31 (חוק בית)",
+data:"נתונים", backup:"גיבוי", restore:"שחזור", backupDone:"הגיבוי נשמר", restoreQ:"להחליף את כל מה שבטלפון בגיבוי?", restoreBad:"הקובץ הזה אינו גיבוי של RummyNest",
+dataNote:"הכל נשמר רק בטלפון הזה.", tourAgain:"הצג את המדריך", deleteAll:"מחק הכל", deleteAllQ:"למחוק את כל המשחקים, הסטטיסטיקה וההגדרות?", deleteAllQ2:"בטוח? אי אפשר לבטל.",
+saveFail:"השמירה נכשלה — ייתכן שהאחסון בטלפון מלא",
+matches:"משחקים", matchesPlayed:"משחקים ששוחקו", handsPlayed:"ידיים ששוחקו", handsWon:"ידיים שניצחת", gins:"ג'ינים", knocks:"דפיקות",
+undercutsFor:"חתכים שעשית", undercutsAg:"פעמים שחתכו אותך", bestWin:"הניצחון הגדול", noStats:"עוד אין משחקים.",
+noReplays:"10 הידיים האחרונות שלך יופיעו כאן.", replay:"ריפליי",
+version:"גרסה", developer:"פיתוח", platform:"פלטפורמה", storage:"אחסון", storageVal:"על המכשיר בלבד", license:"רישיון",
+store:"חנות AppNest", shareApp:"שתף את האפליקציה", shareText:"ג'ין רמי מול המחשב או אונליין עם חברים", feedback:"שלח משוב", privacy:"מדיניות פרטיות",
+disclaimerT:"על המשחק", disclaimer:"RummyNest הוא מימוש עצמאי של חוקי ג'ין רמי המסורתיים, להנאה בלבד. בלי כסף ובלי הימורים. באונליין הטלפונים מתחברים ישירות; שרת PeerJS הציבורי רק מכיר ביניהם.",
+diag:"אבחון", noErrors:"לא נרשמו שגיאות.",
+tour1t:"ג'ין רמי", tour1:"בונים סטים (3 או 4 מאותו מספר) ורצפים (3 ומעלה ברצף, מאותה צורה). קלפים שמחוץ להם הם דדווד.",
+tour2t:"בכל תור", tour2:"לוקחים קלף אחד — מהקופה או מראש הערימה — וזורקים קלף אחד.",
+tour3t:"שימו עין על המונה", tour3:"היד מסתדרת לבד: סדרות (קו זהב) ודדווד. בחרו קלף כדי לראות כמה דדווד יישאר אם תזרקו אותו.",
+tour4t:"דפיקה או ג'ין", tour4:"עם 10 דדווד או פחות אפשר לדפוק. עם אפס — ג'ין! זהירות: אם ליריב יוצא פחות ממך, זה חתך.",
+tour5t:"קלפים או אבנים", tour5:"אוהבים אבנים כמו ברמיקוב? מחליפים בתפריט — אותו משחק, אותם חוקים.",
+tour6t:"משחקים עם חברים", tour6:"אונליין עם קוד חדר והזמנה בוואטסאפ, עם לחץ-ודבר והודעות קוליות.",
+skip:"דלג", next:"הבא", letsPlay:"יאללה",
+hostTitle:"פתח חדר", hostSub:"תקבל קוד לשלוח לחבר.", createRoom:"צור חדר", joinTitle:"הצטרף לחבר", roomCode:"קוד חדר", join:"הצטרף",
+onlineNote:"הטלפונים מתחברים ישירות. הקול עובר מטלפון לטלפון ולא נשמר.",
+codeShort:"הקוד הוא 5 תווים", stOff:"לא מחובר", stConnecting:"מתחבר…", stWaiting:"מחכים לחבר", stOpen:"מחובר",
+stRecon:"מתחבר מחדש…", stNotFound:"החדר לא נמצא — בדוק את הקוד", stError:"אין חיבור לשרת", stFull:"החדר מלא",
+inviteWa:"הזמנה בוואטסאפ", copyLink:"העתק קישור", copied:"הועתק", players:"שחקנים", noOneYet:"עוד אין אף אחד", hostLbl:"מארח", youLbl:"את/ה",
+startGame:"התחל", waitFriend:"מחכים לחבר…", backToGame:"חזרה למשחק", waitHostStart:"המארח יתחיל את המשחק.",
+leaveRoom:"צא מהחדר", leaveQ:"לצאת מהחדר? המשחק ייגמר.", waText:"בוא לשחק איתי ג'ין רמי ב-RummyNest! קוד החדר: {0}",
+friendBack:"{0} חזר", cpuStandIn:"{0} התנתק — המחשב משחק במקומו עד שיחזור",
+youReady:"את/ה מוכן", xReady:"{0} מוכן", waitingX:"מחכים ל{0}", startNoWait:"התחל בלי לחכות",
+holdTalk:"החזק ודבר", talking:"מדבר…", stop:"עצור", openMicOn:"מיקרופון פתוח", openMicOff:"המיקרופון נסגר",
+micDenied:"אין הרשאת מיקרופון — אפשר אותה בהגדרות הדפדפן", tapToHear:"הקש על המסך כדי לשמוע", versionDiff:"לחבר יש גרסה אחרת — כדאי ששניכם תעדכנו",
+alreadyInRoom:"אתה כבר בחדר אחר — צא ממנו קודם", enterNameJoin:"כתוב את השם שלך ולחץ הצטרף",
+fileWarn:"נפתח כקובץ — התקן מהכתובת באינטרנט כדי שהשמירה והאופליין יעבדו",
+phNice:"מהלך יפה!", phHurry:"תורך… 😅", phLucky:"איזה מזל!", phOops:"אופס", phAgain:"עוד אחד?", phGG:"משחק יפה 🤝",
+cancel:"ביטול", ok:"אישור",
+rulesHtml:"<h3>המטרה</h3><p>שני שחקנים. מסדרים את 10 הקלפים ב<b>סדרות</b> ומסיימים את היד עם כמה שפחות <b>דדווד</b> (קלפים בודדים). מי שמגיע ראשון לניקוד היעד מנצח.</p><h3>סדרות</h3><ul><li><b>סט</b> — 3 או 4 קלפים מאותו מספר (7♠ 7♥ 7♦).</li><li><b>רצף</b> — 3 קלפים ומעלה ברצף, מאותה צורה (4♥ 5♥ 6♥). האס רק נמוך: A-2-3 כן, Q-K-A לא.</li></ul><p>ערכים: אס 1, 2–10 לפי המספר, J Q K שווים 10. באבנים — ארבעת הצבעים הם ארבע הצורות, ו-11–13 שווים 10.</p><h3>החלוקה</h3><p>10 קלפים לכל אחד, וקלף אחד נפתח. מי שלא חילק יכול לקחת אותו או לוותר; אחריו המחלק יכול לקחת או לוותר. אם שניהם ויתרו, מי שלא חילק לוקח מהקופה.</p><h3>תור</h3><p>לוקחים קלף אחד — מראש הקופה או מראש הערימה — וזורקים קלף אחד גלוי. אסור לזרוק בחזרה את הקלף שלקחת עכשיו מהערימה.</p><h3>דפיקה</h3><p>אחרי שלקחת, אם הדדווד שלך (אחרי הזריקה) הוא <b>{knock} או פחות</b> — אפשר לדפוק. שתי הידיים נחשפות. היריב יכול <b>להניח</b> קלפים בודדים על הסדרות שלך. אם הדדווד שלך נמוך יותר — מקבלים את ההפרש. אם הדדווד של היריב שווה או נמוך יותר — <b>חתך</b>: הוא מקבל את ההפרש + 25.</p><h3>ג'ין</h3><p>דפיקה עם אפס דדווד היא <b>ג'ין</b>: 25 + הדדווד של היריב, ואסור להניח קלפים.</p><h3>תיקו</h3><p>אם נשארו בקופה רק שני קלפים ואף אחד לא דפק — היד בתיקו.</p><h3>סוף המשחק</h3><p>מי שמגיע ראשון ליעד (בדרך כלל 100) מנצח. עם בונוסים: +100 על המשחק, +25 לכל יד שנוצחה, ואם המפסיד לא קיבל נקודה (שאט-אאוט) הניקוד של המנצח מוכפל. מי שניצח ביד מחלק את היד הבאה.</p><h3>חוקי בית (בהגדרות)</h3><ul><li><b>ביג ג'ין</b> — כל 11 הקלפים בסדרות מיד אחרי שלקחת: 31 + דדווד.</li><li>יעד 50 / 100 / 150 / 250, בונוסים כן/לא.</li></ul>"
+};
+
+/* ---- i18n/en.js ---- */
+LANG.en = {
+tagline:"Gin Rummy against the computer, on one phone or online with a friend. Cards or tiles.",
+gin:"Gin Rummy", ginSub:"2 players · 10 cards · knock or gin",
+continue:"Continue", vsCpu:"Against the computer", vsCpuSub:"Four levels, from easy to expert",
+twoPhone:"Two on one phone", twoPhoneSub:"Pass the phone between turns",
+online:"Online with a friend", onlineSub:"Room code, WhatsApp invite, voice chat",
+rules:"Rules", stats:"Stats", replays:"Replays", settings:"Settings", about:"About",
+you:"You", opponent:"Opponent", computer:"Computer", player:"Player", friend:"Friend", player1:"Player 1", player2:"Player 2",
+lvEasy:"Easy", lvMed:"Medium", lvHard:"Hard", lvExpert:"Expert",
+chooseLevel:"Choose a level", levelNote:"Each level was measured against the one below it over 1,000 matches. The expert rarely knocks early — it waits to undercut you.",
+change:"change", replaceQ:"Start a new match? The current one will be lost.", newGame:"New match",
+deadwood:"Deadwood", stock:"Stock", discardPile:"Discard pile",
+handN:"hand {0}", toN:"to {0}", thinking:"thinking…", theirTurn:"their turn", theyTook:"Took from the pile:",
+cpuTurn:"The computer is playing…", waitFor:"Waiting for {0}…", waitingHost:"Waiting for the host…",
+firstMsg:"Take the face-up card, or pass", firstMsg2:"{0} passed — take the face-up card, or pass too",
+drawMsg:"Draw a card — from the stock or the discard pile", mustDraw:"You both passed — draw from the stock",
+discMsg:"Choose a card to throw", ifThrow:"If you throw {0}: deadwood {1}", noThrowBack:"You can't throw back the card you just took",
+pass:"Pass", takeX:"Take {0}", fromStock:"From the stock", knock:"Knock", knockN:"Knock · {0}", goGin:"Gin!", sure:"Sure? Tap again",
+throw:"Throw", throwX:"Throw {0}", canKnock:"You can knock", ginPossible:"Gin is possible!",
+tookX:"took {0}", drewStock:"drew from the stock", passed:"passed", threwX:"threw {0}", knocked:"knocked", dealt:"Dealt",
+nextHand:"Next hand", matchOver:"Final score", scores:"Score sheet", ready:"Ready", viewTable:"See the table",
+rDraw:"Draw — the stock ran out", rGin:"Gin!", rBigGin:"Big Gin!", rKnock:"Knock", rUndercut:"Undercut!",
+drawExpl:"Only two cards were left in the stock and nobody knocked. No points this hand; the same dealer deals again.",
+calcGin:"25 gin bonus + {0} deadwood", calcBigGin:"31 big gin bonus + {0} deadwood", calcUnder:"{0} − {1} + 25 undercut bonus", calcKnock:"{0} − {1} deadwood",
+ginLbl:"gin", laidOff:"laid off {0}", scoreLine:"Score:", total:"Total", withBonuses:"with bonuses", noBonuses:"no bonuses",
+knockS:"knock", undercutS:"undercut", ginS:"gin",
+winsX:"{0} wins", youWon:"You won the match!", youLost:"The match is lost",
+points:"Points", gameBonus:"Game bonus", boxBonus:"Bonus per hand won", shutout:"Shutout — the winner's total is doubled",
+hintsUsed:"Hints used: {0}", home:"Home", rematch:"Rematch", close:"Close", menu:"Menu",
+sortBy:"Sort", sort_melds:"by melds", sort_suit:"by suit", sort_rank:"by rank",
+useCards:"Use cards", useTiles:"Use tiles", soundOff:"Sound off", soundOn:"Sound on", bigTable:"Big table (landscape)", bigTableNo:"Full screen isn't available here — turn the phone sideways",
+quitMatch:"Quit the match", quitQ:"Quit this match? It won't count.",
+passTo:"Pass the phone to {0}", passHint:"Don't peek at the other player's cards 🙂", imX:"I'm {0} — show my cards",
+hTake:"Take {0} — it helps your hand.", hPass:"Pass on {0} — it doesn't help you.", hDraw:"Draw from the stock — the top of the pile won't help you.",
+hThrow:"Throw {0}.", hKnock:"Knock and throw {0} — your deadwood will be {1}.", hGin:"Throw {0} and go Gin!", hBigGin:"All 11 cards are melded — Big Gin!",
+hWait:"You could knock with {0}, but at this stage the expert would wait — an undercut is likely.",
+cards:"Cards", tiles:"Tiles", tBlack:"black", tRed:"red", tOrange:"orange", tBlue:"blue",
+profile:"Profile", yourName:"Your name", language:"Language", look:"Look", theme:"Colour theme", dayNight:"Day / night", day:"Day", night:"Night",
+tableColor:"Table", bFelt:"Felt", bWood:"Wood", bBlue:"Blue", bContrast:"Contrast", bTheme:"Theme", pieces:"Play with",
+fourColor:"Four-colour suits", fourColorSub:"♦ blue and ♣ green — runs are easier to spot",
+play:"Play", oneTap:"Tap twice to throw", oneTapSub:"A second tap on the chosen card throws it",
+memoryAid:"Show what the opponent took", memoryAidSub:"Cards taken from the discard pile are public — shown next to the opponent",
+sound:"Sound", vibration:"Vibration", gameRules:"Game rules", rulesForNew:"For new matches.", target:"Play to",
+bonuses:"Final bonuses", bonusesSub:"+100 for the match, +25 for each hand won, double for a shutout",
+bigGin:"Big Gin", bigGinSub:"All 11 cards melded after drawing: 31 bonus (house rule)",
+data:"Data", backup:"Backup", restore:"Restore", backupDone:"Backup saved", restoreQ:"Replace everything on this phone with the backup?", restoreBad:"This file isn't a RummyNest backup",
+dataNote:"Everything is stored on this phone only.", tourAgain:"Show the tour", deleteAll:"Delete everything", deleteAllQ:"Delete all games, stats and settings?", deleteAllQ2:"Really? This can't be undone.",
+saveFail:"Saving failed — the phone's storage may be full",
+matches:"Matches", matchesPlayed:"Matches played", handsPlayed:"Hands played", handsWon:"Hands won", gins:"Gins", knocks:"Knocks",
+undercutsFor:"Undercuts you made", undercutsAg:"Times you were undercut", bestWin:"Best win", noStats:"No games yet.",
+noReplays:"Your last 10 hands will appear here.", replay:"Replay",
+version:"Version", developer:"Developer", platform:"Platform", storage:"Storage", storageVal:"On this device only", license:"License",
+store:"AppNest store", shareApp:"Share the app", shareText:"Gin Rummy against the computer or online with friends", feedback:"Send feedback", privacy:"Privacy policy",
+disclaimerT:"About the game", disclaimer:"RummyNest is an original implementation of the traditional Gin Rummy rules, for fun only. No money, no betting. Online play connects phones directly; the public PeerJS server only introduces them.",
+diag:"Diagnostics", noErrors:"No errors recorded.",
+tour1t:"Gin Rummy", tour1:"Build sets (three or four of a rank) and runs (three or more in a row, same suit). Cards outside them are deadwood.",
+tour2t:"Each turn", tour2:"Draw one card — from the stock or the top of the discard pile — then throw one card.",
+tour3t:"Watch the counter", tour3:"Your hand sorts itself into melds (gold line) and deadwood. Pick a card to see your deadwood if you throw it.",
+tour4t:"Knock or gin", tour4:"With 10 or less deadwood you may knock. With zero — gin! But be careful: if the opponent ends lower, it's an undercut.",
+tour5t:"Cards or tiles", tour5:"Prefer stones like Rummikub? Switch in the menu — same game, same rules.",
+tour6t:"Play with friends", tour6:"Online with a room code and WhatsApp invite, with push-to-talk and voice messages.",
+skip:"Skip", next:"Next", letsPlay:"Let's play",
+hostTitle:"Open a room", hostSub:"You get a code to send to a friend.", createRoom:"Create a room", joinTitle:"Join a friend", roomCode:"Room code", join:"Join",
+onlineNote:"Phones connect directly. Voice goes phone to phone and is never stored.",
+codeShort:"The code has 5 characters", stOff:"Not connected", stConnecting:"Connecting…", stWaiting:"Waiting for a friend", stOpen:"Connected",
+stRecon:"Reconnecting…", stNotFound:"Room not found — check the code", stError:"No connection to the server", stFull:"The room is full",
+inviteWa:"Invite on WhatsApp", copyLink:"Copy link", copied:"Copied", players:"Players", noOneYet:"Nobody yet", hostLbl:"host", youLbl:"you",
+startGame:"Start", waitFriend:"Waiting for a friend…", backToGame:"Back to the game", waitHostStart:"The host will start the game.",
+leaveRoom:"Leave the room", leaveQ:"Leave the room? The match will end.", waText:"Come play Gin Rummy with me on RummyNest! Room code: {0}",
+friendBack:"{0} is back", cpuStandIn:"{0} disconnected — the computer plays for them until they're back",
+youReady:"You're ready", xReady:"{0} is ready", waitingX:"waiting for {0}", startNoWait:"Start without waiting",
+holdTalk:"Hold to talk", talking:"talking…", stop:"Stop", openMicOn:"Open mic on", openMicOff:"Open mic off",
+micDenied:"No microphone permission — allow it in the browser settings", tapToHear:"Tap the screen to hear", versionDiff:"Your friend has a different version — you should both update",
+alreadyInRoom:"You're already in another room — leave it first", enterNameJoin:"Enter your name and tap Join",
+fileWarn:"Opened as a file — install from the web address so offline play and saving work",
+phNice:"Nice move!", phHurry:"Your turn… 😅", phLucky:"So lucky!", phOops:"Oops", phAgain:"Another one?", phGG:"Good game 🤝",
+cancel:"Cancel", ok:"OK",
+rulesHtml:"<h3>Goal</h3><p>Two players. Arrange your 10 cards into <b>melds</b> and end the hand with as little <b>deadwood</b> (unmatched cards) as possible. First to the target score wins the match.</p><h3>Melds</h3><ul><li><b>Set</b> — 3 or 4 cards of the same rank (7♠ 7♥ 7♦).</li><li><b>Run</b> — 3 or more in a row in the same suit (4♥ 5♥ 6♥). The ace is low only: A-2-3 yes, Q-K-A no.</li></ul><p>Card values: ace 1, 2–10 face value, J Q K 10. With tiles, the four colours are the four suits and 11–13 count 10.</p><h3>The deal</h3><p>10 cards each; one card is turned face up. The non-dealer may take it or pass; then the dealer may take it or pass. If both pass, the non-dealer draws from the stock.</p><h3>A turn</h3><p>Draw one card — the top of the stock or the top of the discard pile — then throw one card face up. You may not throw back the card you just took from the pile.</p><h3>Knocking</h3><p>After drawing, if your deadwood (after throwing) is <b>{knock} or less</b> you may knock. Both hands are shown. The opponent may <b>lay off</b> loose cards onto your melds. If your deadwood is lower, you score the difference. If the opponent's deadwood is equal or lower — <b>undercut</b>: they score the difference + 25.</p><h3>Gin</h3><p>Knocking with zero deadwood is <b>gin</b>: 25 + the opponent's deadwood, and no laying off is allowed.</p><h3>Draw</h3><p>If only two cards remain in the stock and nobody knocked, the hand is a draw.</p><h3>End of the match</h3><p>First to the target (usually 100) wins. With final bonuses: +100 for the match, +25 for every hand won, and if the loser scored nothing (shutout) the winner's total is doubled. The winner of a hand deals the next one.</p><h3>House rules (settings)</h3><ul><li><b>Big Gin</b> — all 11 cards melded right after drawing: 31 + deadwood.</li><li>Target 50 / 100 / 150 / 250, bonuses on/off.</li></ul>"
+};
+
+/* ---- i18n/ru.js ---- */
+LANG.ru = {
+tagline:"Джин-рамми против компьютера, вдвоём на одном телефоне или онлайн с другом. Карты или фишки.",
+gin:"Джин-рамми", ginSub:"2 игрока · 10 карт · стук или джин",
+continue:"Продолжить", vsCpu:"Против компьютера", vsCpuSub:"Четыре уровня — от лёгкого до эксперта",
+twoPhone:"Вдвоём на одном телефоне", twoPhoneSub:"Передавайте телефон между ходами",
+online:"Онлайн с другом", onlineSub:"Код комнаты, приглашение в WhatsApp, голос",
+rules:"Правила", stats:"Статистика", replays:"Повторы", settings:"Настройки", about:"О приложении",
+you:"Вы", opponent:"Соперник", computer:"Компьютер", player:"Игрок", friend:"Друг", player1:"Игрок 1", player2:"Игрок 2",
+lvEasy:"Лёгкий", lvMed:"Средний", lvHard:"Сложный", lvExpert:"Эксперт",
+chooseLevel:"Выберите уровень", levelNote:"Каждый уровень проверен против предыдущего на 1000 партиях. Эксперт редко стучит рано — он ждёт, чтобы подрезать вас.",
+change:"изменить", replaceQ:"Начать новую партию? Текущая будет потеряна.", newGame:"Новая партия",
+deadwood:"Очки в руке", stock:"Колода", discardPile:"Сброс",
+handN:"раздача {0}", toN:"до {0}", thinking:"думает…", theirTurn:"его ход", theyTook:"Взял из сброса:",
+cpuTurn:"Ходит компьютер…", waitFor:"Ждём {0}…", waitingHost:"Ждём хозяина…",
+firstMsg:"Возьмите открытую карту или пасуйте", firstMsg2:"{0} спасовал — возьмите открытую карту или тоже пасуйте",
+drawMsg:"Возьмите карту — из колоды или из сброса", mustDraw:"Вы оба спасовали — берите из колоды",
+discMsg:"Выберите карту для сброса", ifThrow:"Если сбросить {0}: очков {1}", noThrowBack:"Нельзя сразу сбросить карту, взятую из сброса",
+pass:"Пас", takeX:"Взять {0}", fromStock:"Из колоды", knock:"Стук", knockN:"Стук · {0}", goGin:"Джин!", sure:"Уверены? Нажмите ещё",
+throw:"Сбросить", throwX:"Сбросить {0}", canKnock:"Можно стучать", ginPossible:"Возможен джин!",
+tookX:"взял {0}", drewStock:"взял из колоды", passed:"пас", threwX:"сбросил {0}", knocked:"постучал", dealt:"Раздача",
+nextHand:"Следующая раздача", matchOver:"Итог", scores:"Таблица очков", ready:"Готов", viewTable:"Посмотреть стол",
+rDraw:"Ничья — колода закончилась", rGin:"Джин!", rBigGin:"Большой джин!", rKnock:"Стук", rUndercut:"Подрезка!",
+drawExpl:"В колоде осталось две карты, и никто не постучал. Очков нет, тот же игрок сдаёт снова.",
+calcGin:"25 за джин + {0} очков", calcBigGin:"31 за большой джин + {0} очков", calcUnder:"{0} − {1} + 25 за подрезку", calcKnock:"{0} − {1} очков",
+ginLbl:"джин", laidOff:"подложил {0}", scoreLine:"Счёт:", total:"Итого", withBonuses:"с бонусами", noBonuses:"без бонусов",
+knockS:"стук", undercutS:"подрезка", ginS:"джин",
+winsX:"Победил {0}", youWon:"Вы выиграли партию!", youLost:"Партия проиграна",
+points:"Очки", gameBonus:"Бонус за партию", boxBonus:"Бонус за выигранные раздачи", shutout:"Всухую — итог победителя удваивается",
+hintsUsed:"Подсказок: {0}", home:"Домой", rematch:"Реванш", close:"Закрыть", menu:"Меню",
+sortBy:"Сортировка", sort_melds:"по комбинациям", sort_suit:"по масти", sort_rank:"по значению",
+useCards:"Играть картами", useTiles:"Играть фишками", soundOff:"Выключить звук", soundOn:"Включить звук", bigTable:"Большой стол (горизонтально)", bigTableNo:"Полный экран недоступен — поверните телефон",
+quitMatch:"Выйти из партии", quitQ:"Выйти из партии? Она не будет засчитана.",
+passTo:"Передайте телефон: {0}", passHint:"Не подглядывайте в карты соперника 🙂", imX:"Я {0} — показать карты",
+hTake:"Возьмите {0} — она помогает руке.", hPass:"Пасуйте на {0} — она не поможет.", hDraw:"Берите из колоды — карта в сбросе не поможет.",
+hThrow:"Сбросьте {0}.", hKnock:"Стучите и сбросьте {0} — останется {1} очков.", hGin:"Сбросьте {0} — джин!", hBigGin:"Все 11 карт в комбинациях — большой джин!",
+hWait:"Можно постучать с {0}, но эксперт сейчас подождал бы — велик риск подрезки.",
+cards:"Карты", tiles:"Фишки", tBlack:"чёрная", tRed:"красная", tOrange:"оранжевая", tBlue:"синяя",
+profile:"Профиль", yourName:"Ваше имя", language:"Язык", look:"Вид", theme:"Цветовая тема", dayNight:"День / ночь", day:"День", night:"Ночь",
+tableColor:"Стол", bFelt:"Сукно", bWood:"Дерево", bBlue:"Синий", bContrast:"Контраст", bTheme:"Как тема", pieces:"Играть",
+fourColor:"Четыре цвета мастей", fourColorSub:"♦ синие и ♣ зелёные — проще видеть последовательности",
+play:"Игра", oneTap:"Двойное касание сбрасывает", oneTapSub:"Повторное касание выбранной карты сбрасывает её",
+memoryAid:"Показывать, что взял соперник", memoryAidSub:"Карты из сброса видны всем — показываются рядом с соперником",
+sound:"Звук", vibration:"Вибрация", gameRules:"Правила игры", rulesForNew:"Для новых партий.", target:"Играть до",
+bonuses:"Итоговые бонусы", bonusesSub:"+100 за партию, +25 за каждую выигранную раздачу, вдвое при игре всухую",
+bigGin:"Большой джин", bigGinSub:"Все 11 карт в комбинациях сразу после взятия: бонус 31 (домашнее правило)",
+data:"Данные", backup:"Резервная копия", restore:"Восстановить", backupDone:"Копия сохранена", restoreQ:"Заменить всё на телефоне данными из копии?", restoreBad:"Это не копия RummyNest",
+dataNote:"Всё хранится только на этом телефоне.", tourAgain:"Показать обучение", deleteAll:"Удалить всё", deleteAllQ:"Удалить все партии, статистику и настройки?", deleteAllQ2:"Точно? Отменить нельзя.",
+saveFail:"Не удалось сохранить — возможно, память телефона заполнена",
+matches:"Партии", matchesPlayed:"Сыграно партий", handsPlayed:"Сыграно раздач", handsWon:"Выиграно раздач", gins:"Джины", knocks:"Стуки",
+undercutsFor:"Ваши подрезки", undercutsAg:"Вас подрезали", bestWin:"Лучшая победа", noStats:"Пока нет игр.",
+noReplays:"Здесь появятся ваши последние 10 раздач.", replay:"Повтор",
+version:"Версия", developer:"Разработчик", platform:"Платформа", storage:"Хранение", storageVal:"Только на устройстве", license:"Лицензия",
+store:"Магазин AppNest", shareApp:"Поделиться", shareText:"Джин-рамми против компьютера или онлайн с друзьями", feedback:"Отправить отзыв", privacy:"Конфиденциальность",
+disclaimerT:"Об игре", disclaimer:"RummyNest — собственная реализация традиционных правил джин-рамми, только для развлечения. Без денег и ставок. Онлайн телефоны соединяются напрямую; публичный сервер PeerJS лишь знакомит их.",
+diag:"Диагностика", noErrors:"Ошибок нет.",
+tour1t:"Джин-рамми", tour1:"Собирайте сеты (3–4 карты одного значения) и последовательности (3+ подряд одной масти). Остальные карты — очки в руке.",
+tour2t:"Каждый ход", tour2:"Возьмите карту — из колоды или верхнюю из сброса — и сбросьте одну.",
+tour3t:"Следите за счётчиком", tour3:"Рука сама делится на комбинации (золотая линия) и лишние карты. Выберите карту, чтобы увидеть очки после её сброса.",
+tour4t:"Стук или джин", tour4:"При 10 очках или меньше можно стучать. При нуле — джин! Осторожно: если у соперника меньше, это подрезка.",
+tour5t:"Карты или фишки", tour5:"Любите фишки как в Руммикуб? Переключите в меню — та же игра.",
+tour6t:"Играйте с друзьями", tour6:"Онлайн по коду комнаты и приглашению в WhatsApp, с рацией и голосовыми сообщениями.",
+skip:"Пропустить", next:"Далее", letsPlay:"Играть",
+hostTitle:"Открыть комнату", hostSub:"Вы получите код для друга.", createRoom:"Создать комнату", joinTitle:"Присоединиться к другу", roomCode:"Код комнаты", join:"Войти",
+onlineNote:"Телефоны соединяются напрямую. Голос идёт с телефона на телефон и не сохраняется.",
+codeShort:"В коде 5 символов", stOff:"Нет связи", stConnecting:"Подключение…", stWaiting:"Ждём друга", stOpen:"Подключено",
+stRecon:"Переподключение…", stNotFound:"Комната не найдена — проверьте код", stError:"Нет связи с сервером", stFull:"Комната заполнена",
+inviteWa:"Пригласить в WhatsApp", copyLink:"Копировать ссылку", copied:"Скопировано", players:"Игроки", noOneYet:"Пока никого", hostLbl:"хозяин", youLbl:"вы",
+startGame:"Начать", waitFriend:"Ждём друга…", backToGame:"Вернуться к игре", waitHostStart:"Хозяин начнёт игру.",
+leaveRoom:"Выйти из комнаты", leaveQ:"Выйти из комнаты? Партия закончится.", waText:"Давай сыграем в джин-рамми в RummyNest! Код комнаты: {0}",
+friendBack:"{0} вернулся", cpuStandIn:"{0} отключился — компьютер играет за него, пока он не вернётся",
+youReady:"Вы готовы", xReady:"{0} готов", waitingX:"ждём: {0}", startNoWait:"Начать без ожидания",
+holdTalk:"Удерживайте и говорите", talking:"говорит…", stop:"Стоп", openMicOn:"Микрофон включён", openMicOff:"Микрофон выключен",
+micDenied:"Нет доступа к микрофону — разрешите его в настройках браузера", tapToHear:"Коснитесь экрана, чтобы услышать", versionDiff:"У друга другая версия — лучше обновиться обоим",
+alreadyInRoom:"Вы уже в другой комнате — сначала выйдите", enterNameJoin:"Введите имя и нажмите «Войти»",
+fileWarn:"Открыто как файл — установите с веб-адреса, чтобы работали сохранение и офлайн",
+phNice:"Отличный ход!", phHurry:"Твой ход… 😅", phLucky:"Вот везёт!", phOops:"Упс", phAgain:"Ещё одну?", phGG:"Хорошая игра 🤝",
+cancel:"Отмена", ok:"ОК",
+rulesHtml:"<h3>Цель</h3><p>Два игрока. Соберите 10 карт в <b>комбинации</b> и закончите раздачу с минимумом <b>лишних очков</b>. Кто первым наберёт цель, выигрывает партию.</p><h3>Комбинации</h3><ul><li><b>Сет</b> — 3 или 4 карты одного значения (7♠ 7♥ 7♦).</li><li><b>Последовательность</b> — 3+ карты подряд одной масти (4♥ 5♥ 6♥). Туз только младший: A-2-3 да, Q-K-A нет.</li></ul><p>Стоимость: туз 1, 2–10 по номиналу, J Q K — 10. С фишками четыре цвета — четыре масти, 11–13 стоят 10.</p><h3>Раздача</h3><p>По 10 карт, одна карта открывается. Не сдававший может взять её или спасовать; затем сдающий. Если оба пасуют, не сдававший берёт из колоды.</p><h3>Ход</h3><p>Возьмите одну карту — из колоды или верхнюю из сброса — и сбросьте одну. Нельзя сразу сбросить карту, взятую из сброса.</p><h3>Стук</h3><p>Если после сброса у вас <b>{knock} очков или меньше</b>, можно постучать. Руки открываются. Соперник может <b>подложить</b> лишние карты к вашим комбинациям. Если у вас меньше — вы получаете разницу. Если у соперника столько же или меньше — <b>подрезка</b>: он получает разницу + 25.</p><h3>Джин</h3><p>Стук без лишних очков — <b>джин</b>: 25 + очки соперника, подкладывать нельзя.</p><h3>Ничья</h3><p>Если в колоде осталось две карты и никто не постучал — ничья.</p><h3>Конец партии</h3><p>Побеждает тот, кто первым набрал цель (обычно 100). С бонусами: +100 за партию, +25 за каждую выигранную раздачу, а если проигравший не набрал ни очка — итог победителя удваивается. Победитель раздачи сдаёт следующую.</p><h3>Домашние правила</h3><ul><li><b>Большой джин</b> — все 11 карт в комбинациях сразу после взятия: 31 + очки.</li><li>Цель 50 / 100 / 150 / 250, бонусы вкл/выкл.</li></ul>"
+};
+
+/* ---- i18n/es.js ---- */
+LANG.es = {
+tagline:"Gin Rummy contra el ordenador, dos en un teléfono u online con un amigo. Cartas o fichas.",
+gin:"Gin Rummy", ginSub:"2 jugadores · 10 cartas · cerrar o gin",
+continue:"Continuar", vsCpu:"Contra el ordenador", vsCpuSub:"Cuatro niveles, de fácil a experto",
+twoPhone:"Dos en un teléfono", twoPhoneSub:"Pasad el teléfono entre turnos",
+online:"Online con un amigo", onlineSub:"Código de sala, invitación por WhatsApp, voz",
+rules:"Reglas", stats:"Estadísticas", replays:"Repeticiones", settings:"Ajustes", about:"Acerca de",
+you:"Tú", opponent:"Rival", computer:"Ordenador", player:"Jugador", friend:"Amigo", player1:"Jugador 1", player2:"Jugador 2",
+lvEasy:"Fácil", lvMed:"Medio", lvHard:"Difícil", lvExpert:"Experto",
+chooseLevel:"Elige un nivel", levelNote:"Cada nivel se midió contra el anterior en 1000 partidas. El experto casi nunca cierra pronto: espera para hacerte undercut.",
+change:"cambiar", replaceQ:"¿Empezar una partida nueva? Se perderá la actual.", newGame:"Partida nueva",
+deadwood:"Puntos sueltos", stock:"Mazo", discardPile:"Descartes",
+handN:"mano {0}", toN:"a {0}", thinking:"pensando…", theirTurn:"su turno", theyTook:"Cogió de descartes:",
+cpuTurn:"Juega el ordenador…", waitFor:"Esperando a {0}…", waitingHost:"Esperando al anfitrión…",
+firstMsg:"Coge la carta descubierta o pasa", firstMsg2:"{0} pasó: coge la carta descubierta o pasa tú también",
+drawMsg:"Roba una carta: del mazo o de los descartes", mustDraw:"Habéis pasado los dos: roba del mazo",
+discMsg:"Elige una carta para descartar", ifThrow:"Si descartas {0}: {1} puntos sueltos", noThrowBack:"No puedes descartar la carta que acabas de coger",
+pass:"Pasar", takeX:"Coger {0}", fromStock:"Del mazo", knock:"Cerrar", knockN:"Cerrar · {0}", goGin:"¡Gin!", sure:"¿Seguro? Toca otra vez",
+throw:"Descartar", throwX:"Descartar {0}", canKnock:"Puedes cerrar", ginPossible:"¡Gin posible!",
+tookX:"cogió {0}", drewStock:"robó del mazo", passed:"pasó", threwX:"descartó {0}", knocked:"cerró", dealt:"Reparto",
+nextHand:"Siguiente mano", matchOver:"Resultado final", scores:"Puntuación", ready:"Listo", viewTable:"Ver la mesa",
+rDraw:"Empate: se acabó el mazo", rGin:"¡Gin!", rBigGin:"¡Big Gin!", rKnock:"Cierre", rUndercut:"¡Undercut!",
+drawExpl:"Solo quedaban dos cartas en el mazo y nadie cerró. No hay puntos; reparte otra vez el mismo jugador.",
+calcGin:"25 de gin + {0} sueltos", calcBigGin:"31 de big gin + {0} sueltos", calcUnder:"{0} − {1} + 25 de undercut", calcKnock:"{0} − {1} sueltos",
+ginLbl:"gin", laidOff:"colocó {0}", scoreLine:"Marcador:", total:"Total", withBonuses:"con bonos", noBonuses:"sin bonos",
+knockS:"cierre", undercutS:"undercut", ginS:"gin",
+winsX:"Gana {0}", youWon:"¡Has ganado la partida!", youLost:"Has perdido la partida",
+points:"Puntos", gameBonus:"Bono de partida", boxBonus:"Bono por mano ganada", shutout:"Blanqueo: el total del ganador se duplica",
+hintsUsed:"Pistas usadas: {0}", home:"Inicio", rematch:"Revancha", close:"Cerrar", menu:"Menú",
+sortBy:"Ordenar", sort_melds:"por combinaciones", sort_suit:"por palo", sort_rank:"por número",
+useCards:"Jugar con cartas", useTiles:"Jugar con fichas", soundOff:"Silenciar", soundOn:"Activar sonido", bigTable:"Mesa grande (horizontal)", bigTableNo:"Pantalla completa no disponible: gira el teléfono",
+quitMatch:"Abandonar la partida", quitQ:"¿Abandonar la partida? No contará.",
+passTo:"Pasa el teléfono a {0}", passHint:"Sin mirar las cartas del otro 🙂", imX:"Soy {0}: mostrar mis cartas",
+hTake:"Coge {0}: te ayuda.", hPass:"Pasa de {0}: no te ayuda.", hDraw:"Roba del mazo: la carta de descartes no te sirve.",
+hThrow:"Descarta {0}.", hKnock:"Cierra descartando {0}: te quedarán {1} sueltos.", hGin:"Descarta {0}: ¡gin!", hBigGin:"Las 11 cartas en combinaciones: ¡big gin!",
+hWait:"Podrías cerrar con {0}, pero en esta fase el experto esperaría: hay riesgo de undercut.",
+cards:"Cartas", tiles:"Fichas", tBlack:"negra", tRed:"roja", tOrange:"naranja", tBlue:"azul",
+profile:"Perfil", yourName:"Tu nombre", language:"Idioma", look:"Aspecto", theme:"Tema de color", dayNight:"Día / noche", day:"Día", night:"Noche",
+tableColor:"Mesa", bFelt:"Tapete", bWood:"Madera", bBlue:"Azul", bContrast:"Contraste", bTheme:"Como el tema", pieces:"Jugar con",
+fourColor:"Palos de cuatro colores", fourColorSub:"♦ azul y ♣ verde: las escaleras se ven mejor",
+play:"Juego", oneTap:"Doble toque descarta", oneTapSub:"Un segundo toque en la carta elegida la descarta",
+memoryAid:"Mostrar lo que cogió el rival", memoryAidSub:"Las cartas cogidas de descartes son públicas; se muestran junto al rival",
+sound:"Sonido", vibration:"Vibración", gameRules:"Reglas de juego", rulesForNew:"Para partidas nuevas.", target:"Jugar a",
+bonuses:"Bonos finales", bonusesSub:"+100 por la partida, +25 por mano ganada, doble si hay blanqueo",
+bigGin:"Big Gin", bigGinSub:"Las 11 cartas en combinaciones al robar: bono de 31 (regla de la casa)",
+data:"Datos", backup:"Copia", restore:"Restaurar", backupDone:"Copia guardada", restoreQ:"¿Sustituir todo en este teléfono por la copia?", restoreBad:"Este archivo no es una copia de RummyNest",
+dataNote:"Todo se guarda solo en este teléfono.", tourAgain:"Ver la guía", deleteAll:"Borrar todo", deleteAllQ:"¿Borrar partidas, estadísticas y ajustes?", deleteAllQ2:"¿Seguro? No se puede deshacer.",
+saveFail:"No se pudo guardar: quizá el almacenamiento está lleno",
+matches:"Partidas", matchesPlayed:"Partidas jugadas", handsPlayed:"Manos jugadas", handsWon:"Manos ganadas", gins:"Gins", knocks:"Cierres",
+undercutsFor:"Undercuts hechos", undercutsAg:"Undercuts recibidos", bestWin:"Mejor victoria", noStats:"Aún no hay partidas.",
+noReplays:"Aquí aparecerán tus últimas 10 manos.", replay:"Repetición",
+version:"Versión", developer:"Desarrollo", platform:"Plataforma", storage:"Almacenamiento", storageVal:"Solo en el dispositivo", license:"Licencia",
+store:"Tienda AppNest", shareApp:"Compartir la app", shareText:"Gin Rummy contra el ordenador u online con amigos", feedback:"Enviar comentarios", privacy:"Privacidad",
+disclaimerT:"Sobre el juego", disclaimer:"RummyNest es una implementación propia de las reglas tradicionales del Gin Rummy, solo por diversión. Sin dinero ni apuestas. Online los teléfonos se conectan directamente; el servidor público de PeerJS solo los presenta.",
+diag:"Diagnóstico", noErrors:"Sin errores registrados.",
+tour1t:"Gin Rummy", tour1:"Forma tríos (3 o 4 del mismo número) y escaleras (3 o más seguidas del mismo palo). Lo demás son puntos sueltos.",
+tour2t:"Cada turno", tour2:"Roba una carta, del mazo o de lo alto de los descartes, y descarta una.",
+tour3t:"Mira el contador", tour3:"Tu mano se ordena sola: combinaciones (línea dorada) y sueltas. Elige una carta para ver tus puntos si la descartas.",
+tour4t:"Cerrar o gin", tour4:"Con 10 o menos puntos sueltos puedes cerrar. Con cero, ¡gin! Cuidado: si el rival queda por debajo, es undercut.",
+tour5t:"Cartas o fichas", tour5:"¿Prefieres fichas como en Rummikub? Cámbialo en el menú: mismo juego.",
+tour6t:"Juega con amigos", tour6:"Online con código de sala e invitación por WhatsApp, con pulsar para hablar y mensajes de voz.",
+skip:"Saltar", next:"Siguiente", letsPlay:"A jugar",
+hostTitle:"Abrir una sala", hostSub:"Recibirás un código para tu amigo.", createRoom:"Crear sala", joinTitle:"Unirse a un amigo", roomCode:"Código de sala", join:"Unirse",
+onlineNote:"Los teléfonos se conectan directamente. La voz va de teléfono a teléfono y no se guarda.",
+codeShort:"El código tiene 5 caracteres", stOff:"Sin conexión", stConnecting:"Conectando…", stWaiting:"Esperando a un amigo", stOpen:"Conectado",
+stRecon:"Reconectando…", stNotFound:"Sala no encontrada: revisa el código", stError:"Sin conexión con el servidor", stFull:"La sala está llena",
+inviteWa:"Invitar por WhatsApp", copyLink:"Copiar enlace", copied:"Copiado", players:"Jugadores", noOneYet:"Todavía nadie", hostLbl:"anfitrión", youLbl:"tú",
+startGame:"Empezar", waitFriend:"Esperando a un amigo…", backToGame:"Volver al juego", waitHostStart:"El anfitrión empezará la partida.",
+leaveRoom:"Salir de la sala", leaveQ:"¿Salir de la sala? La partida terminará.", waText:"¡Juega conmigo al Gin Rummy en RummyNest! Código de sala: {0}",
+friendBack:"{0} ha vuelto", cpuStandIn:"{0} se desconectó: el ordenador juega por él hasta que vuelva",
+youReady:"Estás listo", xReady:"{0} está listo", waitingX:"esperando a {0}", startNoWait:"Empezar sin esperar",
+holdTalk:"Mantén para hablar", talking:"hablando…", stop:"Parar", openMicOn:"Micrófono abierto", openMicOff:"Micrófono cerrado",
+micDenied:"Sin permiso de micrófono: actívalo en el navegador", tapToHear:"Toca la pantalla para oír", versionDiff:"Tu amigo tiene otra versión: conviene que actualicéis",
+alreadyInRoom:"Ya estás en otra sala: sal primero", enterNameJoin:"Escribe tu nombre y pulsa Unirse",
+fileWarn:"Abierto como archivo: instálalo desde la web para guardar y jugar sin conexión",
+phNice:"¡Buena jugada!", phHurry:"Tu turno… 😅", phLucky:"¡Qué suerte!", phOops:"Ups", phAgain:"¿Otra?", phGG:"Buena partida 🤝",
+cancel:"Cancelar", ok:"Aceptar",
+rulesHtml:"<h3>Objetivo</h3><p>Dos jugadores. Ordena tus 10 cartas en <b>combinaciones</b> y termina la mano con los menos <b>puntos sueltos</b> posibles. Gana la partida quien llegue primero a la meta.</p><h3>Combinaciones</h3><ul><li><b>Trío</b>: 3 o 4 cartas del mismo número (7♠ 7♥ 7♦).</li><li><b>Escalera</b>: 3 o más seguidas del mismo palo (4♥ 5♥ 6♥). El as solo es bajo: A-2-3 sí, Q-K-A no.</li></ul><p>Valores: as 1, 2–10 su número, J Q K valen 10. Con fichas, los cuatro colores son los cuatro palos y 11–13 valen 10.</p><h3>Reparto</h3><p>10 cartas cada uno y se descubre una. Quien no reparte puede cogerla o pasar; después el que reparte. Si ambos pasan, quien no reparte roba del mazo.</p><h3>Turno</h3><p>Roba una carta, del mazo o de los descartes, y descarta una boca arriba. No puedes descartar la carta que acabas de coger de los descartes.</p><h3>Cerrar</h3><p>Si tras descartar tienes <b>{knock} o menos</b> puntos sueltos, puedes cerrar. Se enseñan las manos. El rival puede <b>colocar</b> sus cartas sueltas en tus combinaciones. Si tienes menos, ganas la diferencia. Si el rival tiene igual o menos: <b>undercut</b>, gana la diferencia + 25.</p><h3>Gin</h3><p>Cerrar sin puntos sueltos es <b>gin</b>: 25 + los puntos del rival, y no se puede colocar.</p><h3>Empate</h3><p>Si quedan solo dos cartas en el mazo y nadie cierra, la mano es nula.</p><h3>Final</h3><p>Gana quien llega primero a la meta (normalmente 100). Con bonos: +100 por la partida, +25 por mano ganada, y si el perdedor no sumó nada (blanqueo) el total del ganador se duplica. El ganador de una mano reparte la siguiente.</p><h3>Reglas de la casa</h3><ul><li><b>Big Gin</b>: las 11 cartas en combinaciones justo al robar: 31 + sueltos.</li><li>Meta 50 / 100 / 150 / 250, bonos sí/no.</li></ul>"
+};
+
+/* ---- i18n/ar.js ---- */
+LANG.ar = {
+tagline:"جين رامي ضد الكمبيوتر، أو اثنان على هاتف واحد، أو أونلاين مع صديق. أوراق أو أحجار.",
+gin:"جين رامي", ginSub:"لاعبان · 10 أوراق · طرق أو جين",
+continue:"متابعة", vsCpu:"ضد الكمبيوتر", vsCpuSub:"أربعة مستويات من السهل إلى الخبير",
+twoPhone:"اثنان على هاتف واحد", twoPhoneSub:"مرّرا الهاتف بين الأدوار",
+online:"أونلاين مع صديق", onlineSub:"رمز غرفة، دعوة واتساب، صوت",
+rules:"القواعد", stats:"الإحصاءات", replays:"الإعادات", settings:"الإعدادات", about:"حول",
+you:"أنت", opponent:"الخصم", computer:"الكمبيوتر", player:"لاعب", friend:"صديق", player1:"اللاعب 1", player2:"اللاعب 2",
+lvEasy:"سهل", lvMed:"متوسط", lvHard:"صعب", lvExpert:"خبير",
+chooseLevel:"اختر المستوى", levelNote:"كل مستوى قيس مقابل المستوى الأدنى في 1000 مباراة. الخبير نادرًا ما يطرق مبكرًا — ينتظر ليقطعك.",
+change:"تغيير", replaceQ:"بدء مباراة جديدة؟ ستضيع الحالية.", newGame:"مباراة جديدة",
+deadwood:"النقاط الحرة", stock:"الرزمة", discardPile:"المرمى",
+handN:"اليد {0}", toN:"حتى {0}", thinking:"يفكر…", theirTurn:"دوره", theyTook:"أخذ من المرمى:",
+cpuTurn:"الكمبيوتر يلعب…", waitFor:"بانتظار {0}…", waitingHost:"بانتظار المضيف…",
+firstMsg:"خذ الورقة المكشوفة أو مرّر", firstMsg2:"{0} مرّر — خذ الورقة المكشوفة أو مرّر أنت أيضًا",
+drawMsg:"اسحب ورقة — من الرزمة أو من المرمى", mustDraw:"مرّرتما كلاكما — اسحب من الرزمة",
+discMsg:"اختر ورقة لرميها", ifThrow:"إن رميت {0}: النقاط الحرة {1}", noThrowBack:"لا يمكن رمي الورقة التي أخذتها للتو",
+pass:"مرّر", takeX:"خذ {0}", fromStock:"من الرزمة", knock:"اطرق", knockN:"اطرق · {0}", goGin:"جين!", sure:"متأكد؟ اضغط مجددًا",
+throw:"ارمِ", throwX:"ارمِ {0}", canKnock:"يمكنك الطرق", ginPossible:"الجين ممكن!",
+tookX:"أخذ {0}", drewStock:"سحب من الرزمة", passed:"مرّر", threwX:"رمى {0}", knocked:"طرق", dealt:"التوزيع",
+nextHand:"اليد التالية", matchOver:"النتيجة النهائية", scores:"جدول النقاط", ready:"جاهز", viewTable:"عرض الطاولة",
+rDraw:"تعادل — نفدت الرزمة", rGin:"جين!", rBigGin:"جين كبير!", rKnock:"طرق", rUndercut:"قطع!",
+drawExpl:"بقيت ورقتان فقط في الرزمة ولم يطرق أحد. لا نقاط في هذه اليد ويوزع الموزع نفسه مجددًا.",
+calcGin:"25 مكافأة جين + {0} حرة", calcBigGin:"31 مكافأة جين كبير + {0} حرة", calcUnder:"{0} − {1} + 25 مكافأة قطع", calcKnock:"{0} − {1} حرة",
+ginLbl:"جين", laidOff:"ألحق {0}", scoreLine:"النتيجة:", total:"المجموع", withBonuses:"مع المكافآت", noBonuses:"بلا مكافآت",
+knockS:"طرق", undercutS:"قطع", ginS:"جين",
+winsX:"فاز {0}", youWon:"فزت بالمباراة!", youLost:"خسرت المباراة",
+points:"النقاط", gameBonus:"مكافأة المباراة", boxBonus:"مكافأة كل يد رابحة", shutout:"تبييض — يتضاعف مجموع الفائز",
+hintsUsed:"التلميحات: {0}", home:"الرئيسية", rematch:"مباراة أخرى", close:"إغلاق", menu:"القائمة",
+sortBy:"الترتيب", sort_melds:"حسب المجموعات", sort_suit:"حسب النوع", sort_rank:"حسب الرقم",
+useCards:"اللعب بالأوراق", useTiles:"اللعب بالأحجار", soundOff:"كتم الصوت", soundOn:"تشغيل الصوت", bigTable:"طاولة كبيرة (أفقي)", bigTableNo:"ملء الشاشة غير متاح — أدر الهاتف",
+quitMatch:"الانسحاب", quitQ:"الانسحاب من المباراة؟ لن تُحتسب.",
+passTo:"مرّر الهاتف إلى {0}", passHint:"لا تنظر إلى أوراق الآخر 🙂", imX:"أنا {0} — اعرض أوراقي",
+hTake:"خذ {0} — تفيد يدك.", hPass:"مرّر على {0} — لا تفيدك.", hDraw:"اسحب من الرزمة — ورقة المرمى لا تفيدك.",
+hThrow:"ارمِ {0}.", hKnock:"اطرق وارمِ {0} — تبقى {1} نقاط حرة.", hGin:"ارمِ {0} — جين!", hBigGin:"كل الأوراق الـ11 في مجموعات — جين كبير!",
+hWait:"يمكنك الطرق بـ{0}، لكن الخبير كان سينتظر في هذه المرحلة — احتمال القطع كبير.",
+cards:"أوراق", tiles:"أحجار", tBlack:"أسود", tRed:"أحمر", tOrange:"برتقالي", tBlue:"أزرق",
+profile:"الملف", yourName:"اسمك", language:"اللغة", look:"المظهر", theme:"نمط الألوان", dayNight:"نهار / ليل", day:"نهار", night:"ليل",
+tableColor:"الطاولة", bFelt:"لباد", bWood:"خشب", bBlue:"أزرق", bContrast:"تباين", bTheme:"مثل النمط", pieces:"اللعب بـ",
+fourColor:"أربعة ألوان للأنواع", fourColorSub:"♦ أزرق و♣ أخضر — رؤية المتتاليات أسهل",
+play:"اللعب", oneTap:"النقر المزدوج يرمي", oneTapSub:"النقرة الثانية على الورقة المختارة ترميها",
+memoryAid:"إظهار ما أخذه الخصم", memoryAidSub:"الأوراق المأخوذة من المرمى مكشوفة للجميع — تظهر بجانب الخصم",
+sound:"الصوت", vibration:"الاهتزاز", gameRules:"قواعد اللعب", rulesForNew:"للمباريات الجديدة.", target:"اللعب حتى",
+bonuses:"مكافآت النهاية", bonusesSub:"+100 للمباراة، +25 لكل يد رابحة، مضاعفة عند التبييض",
+bigGin:"جين كبير", bigGinSub:"كل الأوراق الـ11 في مجموعات بعد السحب: مكافأة 31 (قاعدة منزلية)",
+data:"البيانات", backup:"نسخ احتياطي", restore:"استعادة", backupDone:"حُفظت النسخة", restoreQ:"استبدال كل ما في الهاتف بالنسخة؟", restoreBad:"هذا الملف ليس نسخة RummyNest",
+dataNote:"كل شيء محفوظ على هذا الهاتف فقط.", tourAgain:"عرض الجولة", deleteAll:"حذف الكل", deleteAllQ:"حذف كل المباريات والإحصاءات والإعدادات؟", deleteAllQ2:"متأكد؟ لا يمكن التراجع.",
+saveFail:"فشل الحفظ — ربما امتلأت ذاكرة الهاتف",
+matches:"المباريات", matchesPlayed:"مباريات لُعبت", handsPlayed:"أيدٍ لُعبت", handsWon:"أيدٍ ربحتها", gins:"جين", knocks:"طرقات",
+undercutsFor:"قطع قمت به", undercutsAg:"مرات قُطعت فيها", bestWin:"أكبر فوز", noStats:"لا مباريات بعد.",
+noReplays:"ستظهر هنا آخر 10 أيدٍ.", replay:"إعادة",
+version:"الإصدار", developer:"المطور", platform:"المنصة", storage:"التخزين", storageVal:"على الجهاز فقط", license:"الترخيص",
+store:"متجر AppNest", shareApp:"شارك التطبيق", shareText:"جين رامي ضد الكمبيوتر أو أونلاين مع الأصدقاء", feedback:"أرسل ملاحظات", privacy:"سياسة الخصوصية",
+disclaimerT:"عن اللعبة", disclaimer:"RummyNest تطبيق مستقل لقواعد جين رامي التقليدية، للتسلية فقط. بلا مال وبلا رهان. في الأونلاين تتصل الهواتف مباشرة؛ خادم PeerJS العام يعرّفها ببعض فقط.",
+diag:"التشخيص", noErrors:"لا أخطاء مسجلة.",
+tour1t:"جين رامي", tour1:"كوّن مجموعات (3 أو 4 من الرقم نفسه) ومتتاليات (3 أو أكثر متتالية من النوع نفسه). الباقي نقاط حرة.",
+tour2t:"في كل دور", tour2:"اسحب ورقة — من الرزمة أو أعلى المرمى — ثم ارمِ ورقة.",
+tour3t:"راقب العداد", tour3:"تترتب يدك تلقائيًا: مجموعات (خط ذهبي) وأوراق حرة. اختر ورقة لترى نقاطك إن رميتها.",
+tour4t:"طرق أو جين", tour4:"بـ10 نقاط حرة أو أقل يمكنك الطرق. بصفر — جين! احذر: إن كان لدى الخصم أقل فهو قطع.",
+tour5t:"أوراق أو أحجار", tour5:"تحب الأحجار مثل الروميكوب؟ بدّل من القائمة — اللعبة نفسها.",
+tour6t:"العب مع الأصدقاء", tour6:"أونلاين برمز غرفة ودعوة واتساب، مع اضغط وتحدث ورسائل صوتية.",
+skip:"تخطَّ", next:"التالي", letsPlay:"هيا نلعب",
+hostTitle:"افتح غرفة", hostSub:"ستحصل على رمز ترسله لصديق.", createRoom:"إنشاء غرفة", joinTitle:"انضم إلى صديق", roomCode:"رمز الغرفة", join:"انضمام",
+onlineNote:"تتصل الهواتف مباشرة. الصوت ينتقل من هاتف لهاتف ولا يُحفظ.",
+codeShort:"الرمز 5 أحرف", stOff:"غير متصل", stConnecting:"جارٍ الاتصال…", stWaiting:"بانتظار صديق", stOpen:"متصل",
+stRecon:"إعادة الاتصال…", stNotFound:"الغرفة غير موجودة — تحقق من الرمز", stError:"لا اتصال بالخادم", stFull:"الغرفة ممتلئة",
+inviteWa:"دعوة عبر واتساب", copyLink:"نسخ الرابط", copied:"تم النسخ", players:"اللاعبون", noOneYet:"لا أحد بعد", hostLbl:"المضيف", youLbl:"أنت",
+startGame:"ابدأ", waitFriend:"بانتظار صديق…", backToGame:"العودة إلى اللعبة", waitHostStart:"سيبدأ المضيف اللعبة.",
+leaveRoom:"مغادرة الغرفة", leaveQ:"مغادرة الغرفة؟ ستنتهي المباراة.", waText:"تعال العب معي جين رامي في RummyNest! رمز الغرفة: {0}",
+friendBack:"عاد {0}", cpuStandIn:"انقطع {0} — الكمبيوتر يلعب عنه حتى يعود",
+youReady:"أنت جاهز", xReady:"{0} جاهز", waitingX:"بانتظار {0}", startNoWait:"ابدأ دون انتظار",
+holdTalk:"اضغط مطولًا وتحدث", talking:"يتحدث…", stop:"إيقاف", openMicOn:"الميكروفون مفتوح", openMicOff:"الميكروفون مغلق",
+micDenied:"لا إذن للميكروفون — اسمح به في إعدادات المتصفح", tapToHear:"انقر على الشاشة لتسمع", versionDiff:"لدى صديقك إصدار مختلف — يُفضّل أن تحدّثا",
+alreadyInRoom:"أنت في غرفة أخرى — غادرها أولًا", enterNameJoin:"اكتب اسمك واضغط انضمام",
+fileWarn:"فُتح كملف — ثبّته من عنوان الويب ليعمل الحفظ واللعب دون اتصال",
+phNice:"حركة جميلة!", phHurry:"دورك… 😅", phLucky:"يا للحظ!", phOops:"أوبس", phAgain:"واحدة أخرى؟", phGG:"لعب جميل 🤝",
+cancel:"إلغاء", ok:"موافق",
+rulesHtml:"<h3>الهدف</h3><p>لاعبان. رتّب أوراقك العشر في <b>مجموعات</b> وأنهِ اليد بأقل <b>نقاط حرة</b> ممكنة. يفوز بالمباراة أول من يصل إلى الهدف.</p><h3>المجموعات</h3><ul><li><b>طقم</b> — 3 أو 4 أوراق من الرقم نفسه (7♠ 7♥ 7♦).</li><li><b>متتالية</b> — 3 أوراق أو أكثر متتالية من النوع نفسه (4♥ 5♥ 6♥). الآس منخفض فقط: A-2-3 نعم، Q-K-A لا.</li></ul><p>القيم: الآس 1، 2–10 حسب الرقم، J Q K تساوي 10. مع الأحجار، الألوان الأربعة هي الأنواع الأربعة و11–13 تساوي 10.</p><h3>التوزيع</h3><p>10 أوراق لكل لاعب وتُكشف ورقة. غير الموزع يأخذها أو يمرّر؛ ثم الموزع. إن مرّرا كلاهما يسحب غير الموزع من الرزمة.</p><h3>الدور</h3><p>اسحب ورقة — من الرزمة أو أعلى المرمى — وارمِ ورقة مكشوفة. لا يجوز رمي الورقة التي أخذتها للتو من المرمى.</p><h3>الطرق</h3><p>إن كانت نقاطك الحرة بعد الرمي <b>{knock} أو أقل</b> يمكنك الطرق. تُكشف اليدان. يمكن للخصم <b>إلحاق</b> أوراقه الحرة بمجموعاتك. إن كانت نقاطك أقل تحصل على الفرق. إن كانت نقاط الخصم مساوية أو أقل — <b>قطع</b>: يحصل على الفرق + 25.</p><h3>جين</h3><p>الطرق بصفر نقاط حرة هو <b>جين</b>: 25 + نقاط الخصم، ولا يجوز الإلحاق.</p><h3>التعادل</h3><p>إن بقيت ورقتان في الرزمة ولم يطرق أحد فاليد تعادل.</p><h3>نهاية المباراة</h3><p>يفوز أول من يصل إلى الهدف (عادة 100). مع المكافآت: +100 للمباراة، +25 لكل يد رابحة، وإن لم يسجل الخاسر شيئًا (تبييض) يتضاعف مجموع الفائز. الفائز باليد يوزع التالية.</p><h3>قواعد منزلية</h3><ul><li><b>جين كبير</b> — كل الأوراق الـ11 في مجموعات بعد السحب مباشرة: 31 + النقاط الحرة.</li><li>الهدف 50 / 100 / 150 / 250، المكافآت نعم/لا.</li></ul>"
+};
+
+/* ---- app_core.js ---- */
+/* =====================================================================
+   RummyNest — app core (storage · settings · screens · cards · sound)
+   ===================================================================== */
+const APP_VERSION = '1.0.0';
+const $ = s => document.querySelector(s), $$ = s => Array.from(document.querySelectorAll(s));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const P = 'rummy_';
+const LRI = '\u2066', PDI = '\u2069', iso = s => LRI + s + PDI;           // keeps "K♣" and "34 : 12" in order inside Hebrew/Arabic text
+
+/* ---------- storage shim: localStorage with an in-memory fallback ---------- */
+const LS = (() => {
+  const mem = {}; let ok = true;
+  try { localStorage.setItem(P + 't', '1'); localStorage.removeItem(P + 't'); } catch (e) { ok = false; }
+  return {
+    get(k, d) { try { const v = ok ? localStorage.getItem(P + k) : mem[k]; return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { const s = JSON.stringify(v); if (ok) localStorage.setItem(P + k, s); else mem[k] = s; return true; } catch (e) { toast(T('saveFail')); return false; } },
+    del(k) { try { if (ok) localStorage.removeItem(P + k); else delete mem[k]; } catch (e) {} },
+    keys() { try { return ok ? Object.keys(localStorage).filter(k => k.startsWith(P)).map(k => k.slice(P.length)) : Object.keys(mem); } catch (e) { return []; } }
+  };
+})();
+try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+
+/* ---------- settings ---------- */
+const DEF = {
+  name: '', lang: 'he', theme: 'gold', mode: 'night', board: 'felt', skin: 'cards', four: false,
+  sound: true, vib: true, sort: 'melds', memory: true, oneTap: true,
+  target: 100, bonuses: true, bigGin: false, level: 1, variant: 'gin', tutDone: false
+};
+const ST = Object.assign({}, DEF, LS.get('set', {}));
+const saveST = () => LS.set('set', ST);
+
+/* ---------- language ---------- */
+const LANGS = { he: 'עברית', en: 'English', ru: 'Русский', es: 'Español', ar: 'العربية' };
+const RTL = () => ST.lang === 'he' || ST.lang === 'ar';
+function T(k, ...a) {
+  let s = (LANG[ST.lang] && LANG[ST.lang][k]) != null ? LANG[ST.lang][k] : (LANG.en[k] != null ? LANG.en[k] : k);
+  a.forEach((v, i) => { s = s.split('{' + i + '}').join(v); });
+  return s;
+}
+function applyLang() {
+  const d = document.documentElement; d.lang = ST.lang; d.dir = RTL() ? 'rtl' : 'ltr';
+  $$('[data-t]').forEach(el => el.textContent = T(el.dataset.t));
+  $$('.back').forEach(b => b.textContent = RTL() ? '→' : '←');
+  document.title = 'RummyNest · ' + T('gin');
+}
+const THEMES = ['gold', 'silver', 'emerald', 'ruby', 'ocean'];
+const THEME_COL = { gold: '#d4a940', silver: '#c9ced6', emerald: '#3fbf7f', ruby: '#e0566a', ocean: '#4aa8e8' };
+function applyLook() {
+  const d = document.documentElement;
+  d.dataset.theme = ST.theme; d.dataset.mode = ST.mode; d.dataset.board = ST.board; d.dataset.skin = ST.skin; d.dataset.four = ST.four ? '1' : '0';
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = ST.mode === 'day' ? '#f4f2ec' : '#0a0a0a';
+  const hm = $('#hMode'); if (hm) hm.textContent = ST.mode === 'day' ? '☀️' : '🌙';
+}
+
+/* ---------- screens · toast · overlays ---------- */
+let SCREEN = 'home';
+function show(id) {
+  $$('.scr').forEach(s => s.classList.toggle('on', s.id === id)); SCREEN = id; window.scrollTo(0, 0);
+  if (id === 'game') requestAnimationFrame(() => typeof renderGame === 'function' && renderGame());
+}
+let toastT = null;
+function toast(msg, ms) { const t = $('#toast'); if (!t) return; t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), ms || 2600); }
+function overlay(html, cls) {
+  const o = document.createElement('div'); o.className = 'ov ' + (cls || ''); o.innerHTML = '<div class="box" role="dialog" aria-modal="true">' + html + '</div>';
+  o.addEventListener('keydown', e => { if (e.key === 'Escape' && !o.dataset.lock) closeOv(o); });
+  $('#ovs').appendChild(o); const f = o.querySelector('button,input,select'); if (f) setTimeout(() => { try { f.focus({ preventScroll: true }); } catch (e) {} }, 30);
+  return o;
+}
+const closeOv = o => { if (o && o.parentNode) o.parentNode.removeChild(o); };
+const closeAllOv = () => $$('#ovs .ov').forEach(closeOv);
+function confirmBox(msg, yes, cb) {
+  const o = overlay('<p style="font-size:17px">' + esc(msg) + '</p><div class="row" style="margin-top:12px"><button class="btn" data-n>' + T('cancel') + '</button><button class="btn main" data-y>' + esc(yes || T('ok')) + '</button></div>', 'center');
+  o.querySelector('[data-n]').onclick = () => closeOv(o);
+  o.querySelector('[data-y]').onclick = () => { closeOv(o); cb(); };
+}
+
+/* ---------- cards / tiles ---------- */
+const SUITS = ['♠', '♥', '♦', '♣'], RL = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+const TCOL = ['tBlack', 'tRed', 'tOrange', 'tBlue'];
+function cardHTML(c, cls, attrs) {
+  cls = cls || ''; attrs = attrs || '';
+  if (c == null) return '<div class="pc bk ' + cls + '" ' + attrs + '></div>';
+  const s = RC.suit(c), r = RC.rank(c), sc = s === 1 ? 'red' : s === 2 ? 'red s2' : s === 3 ? 's3' : '';
+  const mid = r > 10 ? '<div class="face">' + RL[r] + '</div>' : '<div class="pip">' + SUITS[s] + '</div>';
+  return '<div class="pc ' + sc + ' t' + s + ' ' + cls + '" data-c="' + c + '" ' + attrs + ' aria-label="' + esc(cardName(c)) + '">' +
+    '<div class="ix">' + RL[r] + '<s>' + SUITS[s] + '</s></div>' + mid + '<div class="ix b">' + RL[r] + '<s>' + SUITS[s] + '</s></div>' +
+    '<div class="tn"><b>' + r + '</b>' + r + '<i></i></div></div>';
+}
+/* text label — cards: "K♣", tiles: "13 blue"; always isolated so RTL text never flips it */
+function cardTxt(c) {
+  if (c == null) return '';
+  if (ST.skin === 'tiles') return iso(RC.rank(c) + ' ' + T(TCOL[RC.suit(c)]));
+  return iso(RL[RC.rank(c)] + SUITS[RC.suit(c)]);
+}
+function cardName(c) { return ST.skin === 'tiles' ? RC.rank(c) + ' ' + T(TCOL[RC.suit(c)]) : RL[RC.rank(c)] + SUITS[RC.suit(c)]; }
+
+/* runs that touch (4-5-6 + 7-8-9 of one suit) are shown as one run */
+function mergeRuns(melds) {
+  const out = melds.map(m => m.slice());
+  for (let again = true; again;) {
+    again = false;
+    for (let i = 0; i < out.length && !again; i++) for (let j = 0; j < out.length && !again; j++) {
+      if (i === j || !RC.isRun(out[i]) || !RC.isRun(out[j]) || RC.suit(out[i][0]) !== RC.suit(out[j][0])) continue;
+      const hi = Math.max(...out[i].map(RC.rank)), lo = Math.min(...out[j].map(RC.rank));
+      if (hi + 1 === lo) { out[i] = out[i].concat(out[j]); out.splice(j, 1); again = true; }
+    }
+  }
+  return out;
+}
+/* ---------- sound (synthesised, no files) + vibration ---------- */
+let AC = null;
+function beep(kind) {
+  if (!ST.sound) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    const t = AC.currentTime, g = AC.createGain(); g.connect(AC.destination);
+    const tone = (f, d, type, v, at) => { const o = AC.createOscillator(); o.type = type || 'sine'; o.frequency.setValueAtTime(f, t + (at || 0)); const gg = AC.createGain(); gg.gain.setValueAtTime(v || .12, t + (at || 0)); gg.gain.exponentialRampToValueAtTime(.0001, t + (at || 0) + d); o.connect(gg); gg.connect(AC.destination); o.start(t + (at || 0)); o.stop(t + (at || 0) + d + .02); };
+    if (kind === 'card') { const b = AC.createBuffer(1, AC.sampleRate * .05, AC.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3); const s = AC.createBufferSource(); s.buffer = b; const f = AC.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 1800; s.connect(f); f.connect(g); g.gain.value = .35; s.start(); }
+    else if (kind === 'knock') { tone(140, .18, 'triangle', .35); tone(110, .2, 'triangle', .3, .16); }
+    else if (kind === 'gin') { [523, 659, 784, 1047].forEach((f, i) => tone(f, .25, 'triangle', .14, i * .09)); }
+    else if (kind === 'win') { [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, .3, 'sine', .14, i * .11)); }
+    else if (kind === 'lose') { [392, 330, 262].forEach((f, i) => tone(f, .3, 'sine', .12, i * .14)); }
+    else if (kind === 'turn') tone(880, .12, 'sine', .07);
+    else if (kind === 'err') tone(180, .15, 'square', .06);
+  } catch (e) {}
+}
+const buzz = ms => { if (ST.vib && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) {} };
+
+/* ---------- a card flying from one place to another (answers the player's action) ---------- */
+function fly(fromEl, toEl, c, faceDown) {
+  if (!fromEl || !toEl || /[?&]fast=1/.test(location.search) || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  $$('.flyc').slice(0, -3).forEach(x => x.remove());
+  const a = fromEl.getBoundingClientRect(), b = toEl.getBoundingClientRect();
+  if (!a.width || !b.width) return;
+  const d = document.createElement('div'); d.className = 'flyc';
+  d.innerHTML = faceDown ? cardHTML(null) : cardHTML(c);
+  const w = Math.max(30, Math.min(64, a.width)), h = w * 1.42, pc = d.firstChild; pc.style.setProperty('--w', w + 'px');
+  d.style.left = (a.left + a.width / 2 - w / 2) + 'px'; d.style.top = (a.top + a.height / 2 - h / 2) + 'px'; document.body.appendChild(d);
+  requestAnimationFrame(() => requestAnimationFrame(() => { d.style.left = (b.left + b.width / 2 - w / 2) + 'px'; d.style.top = (b.top + b.height / 2 - h / 2) + 'px'; }));
+  setTimeout(() => d.remove(), 380);
+}
+
+/* ---------- error log (shown in the about/diagnostics card) ---------- */
+const ERRS = LS.get('errs', []);
+function logErr(m) { ERRS.unshift({ m: String(m).slice(0, 200), t: new Date().toISOString() }); ERRS.length = Math.min(ERRS.length, 10); LS.set('errs', ERRS); }
+window.addEventListener('error', e => logErr((e.message || 'error') + ' @' + (e.lineno || '')));
+window.addEventListener('unhandledrejection', e => logErr('promise: ' + (e.reason && e.reason.message || e.reason)));
+
+/* ---------- backup / restore ---------- */
+function backup() {
+  const data = { app: 'RummyNest', v: APP_VERSION, user: ST.name, date: new Date().toISOString(), data: {} };
+  LS.keys().forEach(k => { if (k !== 'errs') data.data[k] = LS.get(k); });
+  if (data.data.game && data.data.game.mode === 'online') delete data.data.game;     // a live online session can't be restored elsewhere
+  const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rummynest-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  toast(T('backupDone'));
+}
+function restore(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const d = JSON.parse(r.result); if (!d || d.app !== 'RummyNest' || !d.data) throw new Error('bad');
+      confirmBox(T('restoreQ'), T('restore'), () => { LS.keys().forEach(k => LS.del(k)); Object.keys(d.data).forEach(k => LS.set(k, d.data[k])); location.reload(); });
+    } catch (e) { toast(T('restoreBad')); }
+  };
+  r.readAsText(file);
+}
+
+/* ---- game_ui.js ---- */
+/* =====================================================================
+   RummyNest — the table (Gin): rendering, input, computer pacing, results
+   G = the game on this phone. mode: cpu | two | online
+   cpu/two/online-host hold the full match (G.M); an online guest holds only its view (G.v).
+   ===================================================================== */
+let G = LS.get('game', null);
+const FAST = /[?&]fast=1/.test(location.search);   // tests only: the computer moves without the human-friendly pause
+let SEL = null, NEWC = null, KNOCK_ARM = 0, aiT = null, PASS_ON = false, BUSY = false;
+const LVL = ['lvEasy', 'lvMed', 'lvHard', 'lvExpert'];
+const saveGame = () => { if (G) LS.set('game', G); else LS.del('game'); };
+const isGuest = () => G && G.mode === 'online' && G.net && G.net.role === 'guest';
+const isHostOnline = () => G && G.mode === 'online' && !isGuest();
+
+function mySeat() {
+  if (!G) return 0;
+  if (G.mode === 'online') return G.net && G.net.seat != null ? G.net.seat : (isGuest() ? 1 : 0);
+  if (G.mode === 'two') return G.M.H.phase === 'end' ? (G.viewer != null ? G.viewer : 0) : G.M.H.turn;
+  return 0;
+}
+function curView() {
+  if (!G) return null;
+  if (isGuest()) return G.v;
+  return GIN.view(G.M, mySeat());
+}
+function nameOf(v, s) {
+  if (v.names && v.names[s]) return v.names[s];
+  if (G && G.mode === 'cpu') return s === 1 ? T('computer') + ' · ' + T(LVL[G.level]) : (ST.name || T('you'));
+  return s === v.seat ? T('you') : T('opponent');
+}
+
+/* ---------- start ---------- */
+function startCpu(level) {
+  ST.level = level; saveST();
+  const M = GIN.newMatch({ target: ST.target, bonuses: ST.bonuses, bigGin: ST.bigGin, names: ['', ''], dealer: Math.random() < .5 ? 0 : 1 });
+  G = { mode: 'cpu', level, M, id: Date.now(), hints: 0, counted: {} };
+  NEWC = null; SEL = null; saveGame(); show('game'); afterChange(true);
+}
+function startTwo(n1, n2) {
+  const M = GIN.newMatch({ target: ST.target, bonuses: ST.bonuses, bigGin: ST.bigGin, names: [n1, n2], dealer: Math.random() < .5 ? 0 : 1 });
+  G = { mode: 'two', M, id: Date.now(), hints: 0, counted: {} };
+  NEWC = null; SEL = null; saveGame(); show('game'); PASS_ON = true; afterChange(true);
+}
+
+/* ---------- acting ---------- */
+function doAct(a) {
+  if (BUSY) return;
+  const v = curView(); if (!v || v.phase === 'end' || v.turn !== v.seat) return;
+  KNOCK_ARM = 0;
+  if (isGuest()) { BUSY = true; setTimeout(() => { BUSY = false; }, 1500); netAct(a); animMine(a, v); return; }
+  const s = v.seat;
+  if (!GIN.legal(G.M, s, a)) { beep('err'); buzz(30); renderGame(); return; }
+  animMine(a, v);
+  GIN.apply(G.M, s, a);
+  if (a.a === 'take' || a.a === 'draw') NEWC = G.M.H.hands[s][G.M.H.hands[s].length - 1];
+  if (a.a === 'discard' || a.a === 'knock') { SEL = null; NEWC = null; }
+  G.last = { s, a: a.a, c: a.a === 'take' ? G.M.H.known[s].slice(-1)[0] : (a.c != null ? a.c : null) };
+  afterChange();
+}
+function animMine(a, v) {
+  beep('card'); buzz(12);
+  if (a.a === 'draw') fly($('#pStock'), $('#hand'), null, true);
+  else if (a.a === 'take') fly($('#pDisc'), $('#hand'), v.discard[v.discard.length - 1]);
+  else if (a.a === 'discard' || a.a === 'knock') { const el = $('#hand .pc[data-c="' + a.c + '"]'); fly(el, $('#pDisc'), a.c); }
+}
+/* everything that happens after the match changed (local move, computer move, guest's move on the host) */
+function afterChange(fresh) {
+  if (!G) return;
+  const H = G.M ? G.M.H : null;
+  if (G.mode === 'two' && H && H.phase !== 'end' && G.lastTurn != null && G.lastTurn !== H.turn) PASS_ON = true;
+  if (H) G.lastTurn = H.phase === 'end' ? null : H.turn;
+  saveGame();
+  if (isHostOnline()) netBroadcast();
+  if (H && H.phase === 'end' && !G.counted[G.id + ':' + G.M.handNo]) onHandEnd();
+  renderGame();
+  scheduleAI();
+  if (fresh && G.mode === 'two') renderGame();
+}
+
+/* ---------- the computer's turn (and the stand-in for a disconnected online friend) ---------- */
+function aiSeat() {
+  if (!G || !G.M || G.M.over || G.M.H.phase === 'end') return null;
+  if (G.mode === 'cpu' && G.M.H.turn === 1) return 1;
+  if (isHostOnline() && G.sub && G.M.H.turn === 1) return 1;
+  return null;
+}
+function scheduleAI() {
+  clearTimeout(aiT);
+  const s = aiSeat(); if (s == null) return;
+  const H = G.M.H, slow = H.phase === 'disc' ? 750 : 650;
+  aiT = setTimeout(() => {
+    if (aiSeat() !== s) return;
+    const lvl = G.mode === 'cpu' ? G.level : 2;
+    const a = GIN.act(GIN.view(G.M, s), lvl);
+    if (!a || !GIN.legal(G.M, s, a)) { logErr('ai illegal ' + JSON.stringify(a)); return; }
+    const top = G.M.H.discard[G.M.H.discard.length - 1];
+    GIN.apply(G.M, s, a);
+    G.last = { s, a: a.a, c: a.a === 'take' ? top : (a.c != null ? a.c : null) };
+    if (a.a === 'take') fly($('#pDisc'), $('#oHand'), top);
+    else if (a.a === 'draw') fly($('#pStock'), $('#oHand'), null, true);
+    else if (a.a === 'discard' || a.a === 'knock') fly($('#oHand'), $('#pDisc'), a.c);
+    beep(a.a === 'knock' ? 'knock' : 'card');
+    afterChange();
+    if (G.M.H.phase !== 'end' && G.M.H.turn !== s) { beep('turn'); }
+  }, FAST ? 20 : slow + Math.random() * 350);
+}
+
+/* ---------- hand end: stats, replays, sounds ---------- */
+function onHandEnd() {
+  const M = G.M, H = M.H, res = H.res, key = G.id + ':' + M.handNo; G.counted[key] = 1;
+  const me = G.mode === 'two' ? null : mySeat();
+  if (res.type === 'gin' || res.type === 'biggin') beep('gin'); else if (res.type === 'knock') beep('knock');
+  // replays: last 10 hands (seed + moves)
+  const R = LS.get('replays', []);
+  const vv = GIN.view(M, 0);
+  R.unshift({ d: Date.now(), mode: G.mode, names: [nameOf(vv, 0), nameOf(vv, 1)], seat: me == null ? 0 : me, seed: H.seed, dealer: H.dealer, bigGin: M.bigGin, log: H.log.slice(), type: res.type, winner: res.winner, pts: res.pts || 0, undercut: !!res.undercut });
+  R.length = Math.min(R.length, 10); LS.set('replays', R);
+  addStats(res, me, M);
+  saveGame();
+}
+function addStats(res, me, M) {
+  const S = LS.get('stats', {}); const k = G.mode === 'cpu' ? 'cpu' + G.level : G.mode;
+  const b = S[k] = S[k] || { mp: 0, mw: 0, hp: 0, hw: 0, gin: 0, knock: 0, uFor: 0, uAg: 0, best: 0 };
+  b.hp++;
+  if (me != null && res.type !== 'draw') {
+    if (res.winner === me) b.hw++;
+    if (res.by === me && (res.type === 'gin' || res.type === 'biggin')) b.gin++;
+    if (res.by === me && res.type === 'knock') b.knock++;
+    if (res.undercut && res.winner === me) b.uFor++;
+    if (res.undercut && res.by === me) b.uAg++;
+  }
+  if (M.over && !G.counted['m' + G.id]) {
+    G.counted['m' + G.id] = 1; b.mp++;
+    if (me != null && M.winner === me) { b.mw++; b.best = Math.max(b.best, M.final.total[me] - M.final.total[1 - me]); }
+    if (me == null || M.winner === me) beep('win'); else beep('lose');
+  }
+  LS.set('stats', S);
+}
+
+/* ---------- layout of my hand ---------- */
+function arrange(hand) {
+  const h = hand.slice();
+  if (ST.sort === 'suit') return { groups: [h.sort((a, b) => RC.suit(a) - RC.suit(b) || RC.rank(a) - RC.rank(b))], melded: new Set() };
+  if (ST.sort === 'rank') return { groups: [h.sort((a, b) => RC.rank(a) - RC.rank(b) || RC.suit(a) - RC.suit(b))], melded: new Set() };
+  const b = RC.best(h), melded = new Set();
+  const ms = mergeRuns(b.melds).map(m => m.slice().sort((x, y) => RC.rank(x) - RC.rank(y) || RC.suit(x) - RC.suit(y)));
+  ms.forEach(m => m.forEach(c => melded.add(c)));
+  ms.sort((a, b) => RC.rank(a[0]) - RC.rank(b[0]));
+  const dead = b.dead.slice().sort((x, y) => RC.rank(x) - RC.rank(y) || RC.suit(x) - RC.suit(y));
+  return { groups: ms.concat(dead.length ? [dead] : []), melded, meldCount: ms.length };
+}
+function layoutHand(hand) {
+  const el = $('#hand'), W = Math.min(el.parentNode.clientWidth - 8, 620), A = arrange(hand), n = hand.length;
+  let cw = Math.max(44, Math.min(78, Math.round(W / 6.2)));
+  if (innerWidth > innerHeight && innerHeight < 520) cw = Math.min(cw, Math.round(innerHeight * .16));
+  const ch = Math.round(cw * (ST.skin === 'tiles' ? 1.32 : 1.42));
+  const gap = A.groups.length > 1 ? 10 : 0, gaps = gap * (A.groups.length - 1);
+  const step = n > 1 ? Math.min(cw + 4, (W - cw - gaps) / (n - 1)) : 0;
+  const total = (n - 1) * step + cw + gaps;
+  el.style.width = Math.ceil(total) + 'px'; el.style.setProperty('--hh', (ch + 30) + 'px');
+  let x = 0, html = '';
+  A.groups.forEach((g, gi) => {
+    const x0 = x;
+    g.forEach(c => {
+      const cls = (c === SEL ? 'sel ' : '') + (c === NEWC ? 'new ' : '') + (A.melded.has(c) || ST.sort !== 'melds' ? '' : 'dead');
+      html += cardHTML(c, cls, 'style="--w:' + cw + 'px;left:' + x.toFixed(1) + 'px" tabindex="0" role="button"');
+      x += step;
+    });
+    if (ST.sort === 'melds' && gi < (A.meldCount || 0)) html += '<span class="grp" style="left:' + x0.toFixed(1) + 'px;width:' + (x - step - x0 + cw).toFixed(1) + 'px"></span>';
+    x += gap;
+  });
+  el.innerHTML = html;
+}
+
+/* ---------- render ---------- */
+function setBtn(b, label, on, cls) { b.textContent = label; b.disabled = !on; b.className = 'btn ' + (cls || ''); }
+function renderGame() {
+  if (SCREEN !== 'game' || !G) return;
+  const v = curView(); if (!v) { $('#gMsg').textContent = T('waitingHost'); return; }
+  const s = v.seat, o = 1 - s, myTurn = v.turn === s && v.phase !== 'end', H = v;
+  const hidden = G.mode === 'two' && PASS_ON && v.phase !== 'end';
+  $('#gTitle').textContent = T('gin') + ' · ' + T('handN', v.handNo);
+  $('#gSub').textContent = T('toN', v.target);
+  $('#gScore').textContent = iso(v.scores[s] + ' : ' + v.scores[o]);
+  // opponent
+  $('#oName').textContent = nameOf(v, o) + (G.sub ? ' 🤖' : '');
+  const stat = $('#oStat');
+  if (v.phase === 'end') stat.textContent = '';
+  else if (v.turn === o) stat.textContent = G.mode === 'cpu' || G.sub ? T('thinking') : T('theirTurn');
+  else stat.textContent = lastActTxt(v, o);
+  $('#opp').classList.toggle('turn', v.turn === o && v.phase !== 'end');
+  const dot = $('#oDot');
+  dot.className = 'dot ' + (G.mode !== 'online' ? 'on' : (G.sub ? 'sub' : (rosterOnline(o) ? 'on' : '')));
+  const nb = v.phase === 'end' ? 0 : v.oppCount, ow = innerWidth > innerHeight && innerHeight < 520 ? 26 : Math.max(26, Math.min(40, Math.round(($('#game').clientWidth || 400) / 12)));
+  $('#oHand').innerHTML = Array.from({ length: nb }, () => cardHTML(null, '', 'style="--w:' + ow + 'px"')).join('');
+  $$('#oHand .pc').forEach((p, i) => { if (i) p.style.marginLeft = (-ow * .62) + 'px'; });
+  const kn = ST.memory && v.phase !== 'end' ? v.known[o] : [];
+  $('#oKnown').innerHTML = kn.length ? '<span class="chip" style="align-self:center">' + esc(T('theyTook')) + '</span>' + kn.map(c => cardHTML(c, 'mini')).join('') : '';
+  // piles
+  const sc = v.stockCount;
+  const pw = Math.max(52, Math.min(74, Math.round(($('#game').clientWidth || 400) / 6.2)));
+  $('#stockStack').innerHTML = sc ? Array.from({ length: Math.min(3, sc) }, (_, i) => cardHTML(null, '', 'style="--w:' + pw + 'px;transform:translate(' + (-i * 2) + 'px,' + (-i * 2) + 'px)"')).join('') : '<div class="pc" style="--w:' + pw + 'px;opacity:.15"></div>';
+  $('#stockLbl').textContent = T('stock') + ' · ' + sc;
+  const d = v.discard, tp = d[d.length - 1];
+  $('#discStack').innerHTML = (d.length > 1 ? cardHTML(d[d.length - 2], 'under', 'style="--w:' + pw + 'px"') : '') + (tp != null ? cardHTML(tp, '', 'style="--w:' + pw + 'px;position:relative"') : '<div class="pc" style="--w:' + pw + 'px;opacity:.15"></div>');
+  $('#discLbl').textContent = T('discardPile');
+  const canTake = myTurn && (v.phase === 'first' || (v.phase === 'draw' && !v.noTake)) && tp != null;
+  const canDraw = myTurn && v.phase === 'draw';
+  $('#pDisc').classList.toggle('can', canTake && !hidden);
+  $('#pStock').classList.toggle('can', canDraw && !hidden);
+  // my hand
+  if (hidden) { $('#hand').innerHTML = ''; $('#myDw').textContent = '–'; }
+  else layoutHand(v.hand);
+  if (SEL != null && !v.hand.includes(SEL)) SEL = null;
+  const b = RC.best(v.hand); if (!hidden) $('#myDw').textContent = b.dw;
+  const ck = $('#canKnock'); ck.classList.add('hide');
+  let minDw = 99;
+  if (myTurn && v.phase === 'disc') for (const c of v.hand) if (c !== v.took) minDw = Math.min(minDw, RC.best(v.hand.filter(x => x !== c)).dw);
+  if (myTurn && v.phase === 'disc' && minDw <= GIN.KNOCK && !hidden) { ck.textContent = minDw === 0 ? T('ginPossible') : T('canKnock'); ck.className = 'chip go'; }
+  $('#mySort').textContent = T('sort_' + ST.sort);
+  // message + buttons
+  const msg = $('#gMsg'), A = $('#bA'), B = $('#bB');
+  let selDw = null; if (SEL != null && v.phase === 'disc' && myTurn) selDw = RC.best(v.hand.filter(x => x !== SEL)).dw;
+  if (v.phase === 'end') { msg.textContent = ''; setBtn(A, T('scores'), true, 'ghosty'); setBtn(B, v.over ? T('matchOver') : T('nextHand'), true, 'main'); }
+  else if (!myTurn) {
+    msg.textContent = G.mode === 'cpu' ? T('cpuTurn') : T('waitFor', nameOf(v, o));
+    setBtn(A, '…', false); setBtn(B, '…', false, 'main');
+  } else if (v.phase === 'first') {
+    msg.textContent = v.passes || (v.log.length && v.log[v.log.length - 1][1] === 'pass') ? T('firstMsg2', nameOf(v, o)) : T('firstMsg');
+    setBtn(A, T('pass'), true); setBtn(B, T('takeX', cardTxt(tp)), true, 'main');
+  } else if (v.phase === 'draw') {
+    msg.textContent = v.noTake ? T('mustDraw') : T('drawMsg');
+    setBtn(A, T('fromStock'), true, 'main'); setBtn(B, tp != null ? T('takeX', cardTxt(tp)) : T('discardPile'), canTake, canTake ? '' : '');
+  } else {
+    msg.textContent = SEL == null ? T('discMsg') : (selDw != null ? T('ifThrow', cardTxt(SEL), selDw) : '');
+    const knockOk = SEL != null && selDw <= GIN.KNOCK && SEL !== v.took;
+    const armed = KNOCK_ARM && Date.now() - KNOCK_ARM < 2500;
+    setBtn(A, armed ? T('sure') : (knockOk ? (selDw === 0 ? T('goGin') : T('knockN', selDw)) : T('knock')), knockOk, knockOk ? 'hot' : '');
+    setBtn(B, SEL != null ? T('throwX', cardTxt(SEL)) : T('throw'), SEL != null && SEL !== v.took, 'main');
+    if (SEL != null && SEL === v.took) msg.textContent = T('noThrowBack');
+  }
+  if (hidden) { setBtn(A, '…', false); setBtn(B, '…', false, 'main'); }
+  $('#bHint').disabled = !myTurn || hidden || G.mode === 'online';
+  $('#bHint').classList.toggle('hide', G.mode === 'online');
+  renderNet();
+  // overlays that belong to the state
+  if (hidden) showPass(v); else hidePass();
+  if (v.phase === 'end' && !$('#ovs .ov.res') && !G.resSeen) showResult(v);
+}
+function lastActTxt(v, s) {
+  for (let i = v.log.length - 1; i >= 0; i--) {
+    const [w, a, c] = v.log[i]; if (w !== s) continue;
+    if (a === 'take') return T('tookX', cardTxt(c));
+    if (a === 'draw') return T('drewStock');
+    if (a === 'pass') return T('passed');
+    if (a === 'discard') { const prev = v.log[i - 1]; return (prev && prev[0] === s && prev[1] === 'take' ? T('tookX', cardTxt(prev[2])) + ' · ' : prev && prev[0] === s && prev[1] === 'draw' ? T('drewStock') + ' · ' : '') + T('threwX', cardTxt(c)); }
+    return '';
+  }
+  return '';
+}
+
+/* ---------- two players on one phone: hide the hand between turns ---------- */
+function showPass(v) {
+  let p = $('#passScr'); const nm = nameOf(v, v.turn);
+  if (!p) { p = document.createElement('div'); p.id = 'passScr'; p.className = 'pass'; document.body.appendChild(p); }
+  p.innerHTML = '<div style="font-size:54px">🤝</div><h2>' + esc(T('passTo', nm)) + '</h2><p>' + esc(T('passHint')) + '</p><button class="btn main" id="passGo" style="min-width:240px">' + esc(T('imX', nm)) + '</button>';
+  $('#passGo').onclick = () => { PASS_ON = false; SEL = null; NEWC = null; renderGame(); };
+}
+function hidePass() { const p = $('#passScr'); if (p) p.remove(); }
+
+/* ---------- input ---------- */
+function tapCard(c) {
+  const v = curView(); if (!v || v.phase === 'end') return;
+  const myTurn = v.turn === v.seat;
+  if (SEL === c) {
+    if (ST.oneTap && myTurn && v.phase === 'disc' && c !== v.took) { doAct({ a: 'discard', c }); return; }
+    SEL = null;
+  } else SEL = c;
+  KNOCK_ARM = 0; beep('card'); renderGame();
+}
+function tapStock() {
+  const v = curView(); if (!v || v.turn !== v.seat || v.phase === 'end') return;
+  if (v.phase === 'draw') doAct({ a: 'draw' });
+  else if (v.phase === 'first') toast(T('firstMsg'));
+  else toast(T('discMsg'));
+}
+function tapDiscard() {
+  const v = curView(); if (!v || v.turn !== v.seat || v.phase === 'end') return;
+  if (v.phase === 'first' || (v.phase === 'draw' && !v.noTake)) doAct({ a: 'take' });
+  else if (v.phase === 'draw') toast(T('mustDraw'));
+  else if (SEL != null) { if (SEL === v.took) toast(T('noThrowBack')); else doAct({ a: 'discard', c: SEL }); }
+  else toast(T('discMsg'));
+}
+function btnA() {
+  const v = curView(); if (!v) return;
+  if (v.phase === 'end') return showScores(v);
+  if (v.turn !== v.seat) return;
+  if (v.phase === 'first') return doAct({ a: 'pass' });
+  if (v.phase === 'draw') return doAct({ a: 'draw' });
+  if (v.phase === 'disc' && SEL != null) {
+    if (KNOCK_ARM && Date.now() - KNOCK_ARM < 2500) { KNOCK_ARM = 0; beep('knock'); buzz(60); return doAct({ a: 'knock', c: SEL }); }
+    KNOCK_ARM = Date.now(); renderGame(); setTimeout(() => { if (KNOCK_ARM && Date.now() - KNOCK_ARM >= 2500) { KNOCK_ARM = 0; renderGame(); } }, 2600);
+  }
+}
+function btnB() {
+  const v = curView(); if (!v) return;
+  if (v.phase === 'end') { if (v.over) return showFinal(v); return nextHandAsk(); }
+  if (v.turn !== v.seat) return;
+  if (v.phase === 'first' || v.phase === 'draw') return doAct({ a: 'take' });
+  if (v.phase === 'disc' && SEL != null) doAct({ a: 'discard', c: SEL });
+}
+/* drag a card onto the discard pile (pointer events; taps still work) */
+function bindHand() {
+  const hand = $('#hand'); let drag = null;
+  hand.addEventListener('pointerdown', e => {
+    const el = e.target.closest('.pc'); if (!el) return;
+    drag = { el, c: +el.dataset.c, x: e.clientX, y: e.clientY, moved: false, ghost: null };
+    try { hand.setPointerCapture(e.pointerId); } catch (x) {}
+  });
+  hand.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) > 12) {
+      drag.moved = true;
+      const g = drag.ghost = document.createElement('div'); g.className = 'dragGhost';
+      g.style.cssText = 'position:fixed;z-index:46;pointer-events:none;transform:translate(-50%,-80%) rotate(-4deg)';
+      g.innerHTML = cardHTML(drag.c, '', 'style="--w:' + drag.el.offsetWidth + 'px"'); document.body.appendChild(g); drag.el.style.opacity = '.3';
+    }
+    if (drag.moved) {
+      drag.ghost.style.left = e.clientX + 'px'; drag.ghost.style.top = e.clientY + 'px';
+      $('#pDisc').classList.toggle('drop', overDiscard(e.clientX, e.clientY));
+    }
+  });
+  const end = e => {
+    if (!drag) return; const d = drag; drag = null;
+    if (d.ghost) d.ghost.remove(); d.el.style.opacity = ''; $('#pDisc').classList.remove('drop');
+    if (!d.moved) { tapCard(d.c); return; }
+    if (e.type === 'pointerup' && overDiscard(e.clientX, e.clientY)) {
+      const v = curView();
+      if (v && v.turn === v.seat && v.phase === 'disc' && d.c !== v.took) { SEL = d.c; doAct({ a: 'discard', c: d.c }); return; }
+      if (v && d.c === v.took) toast(T('noThrowBack'));
+    }
+    SEL = d.c; renderGame();
+  };
+  hand.addEventListener('pointerup', end); hand.addEventListener('pointercancel', end);
+  hand.addEventListener('keydown', e => { const el = e.target.closest('.pc'); if (el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); tapCard(+el.dataset.c); } });
+}
+function overDiscard(x, y) { const r = $('#pDisc').getBoundingClientRect(); return x > r.left - 30 && x < r.right + 30 && y > r.top - 30 && y < r.bottom + 30; }   // generous target
+
+/* ---------- hint (the expert, seeing only what you see) ---------- */
+function hint() {
+  const v = curView(); if (!v || v.turn !== v.seat || v.phase === 'end') return;
+  G.hints = (G.hints || 0) + 1; saveGame();
+  const a = GIN.act(v, 3), tp = v.discard[v.discard.length - 1];
+  let txt = '';
+  if (a.a === 'take') txt = T('hTake', cardTxt(tp));
+  else if (a.a === 'pass') txt = T('hPass', cardTxt(tp));
+  else if (a.a === 'draw') txt = T('hDraw');
+  else if (a.a === 'knock') { SEL = a.c; const dw = RC.best(v.hand.filter(x => x !== a.c)).dw; txt = dw === 0 ? T('hGin', cardTxt(a.c)) : T('hKnock', cardTxt(a.c), dw); }
+  else if (a.a === 'discard') {
+    SEL = a.c; txt = T('hThrow', cardTxt(a.c));
+    let minDw = 99; for (const c of v.hand) if (c !== v.took) minDw = Math.min(minDw, RC.best(v.hand.filter(x => x !== c)).dw);
+    if (minDw <= GIN.KNOCK) txt += ' ' + T('hWait', minDw);
+  } else if (a.a === 'biggin') txt = T('hBigGin');
+  renderGame(); toast('💡 ' + txt, 5200);
+}
+
+/* ---------- results ---------- */
+function meldsHTML(melds, dead, laid, deadCls) {
+  if (!laid || !laid.length) melds = mergeRuns(melds);
+  let h = '<div class="melds">';
+  melds.forEach((m, mi) => {
+    const lay = (laid || []).filter(x => x.mi === mi).map(x => x.c);
+    const all = m.concat(lay).sort((a, b) => RC.rank(a) - RC.rank(b) || RC.suit(a) - RC.suit(b));
+    h += '<div class="meld">' + all.map(c => cardHTML(c, lay.includes(c) ? 'lay' : '')).join('') + '</div>';
+  });
+  if (dead.length) h += '<div class="meld">' + dead.slice().sort((a, b) => RC.rank(a) - RC.rank(b)).map(c => cardHTML(c, deadCls || 'dw')).join('') + '</div>';
+  return h + '</div>';
+}
+function resultTitle(res) {
+  if (res.type === 'draw') return T('rDraw');
+  if (res.type === 'gin') return T('rGin');
+  if (res.type === 'biggin') return T('rBigGin');
+  return res.undercut ? T('rUndercut') : T('rKnock');
+}
+function showResult(v) {
+  closeAllOv();
+  const res = v.res, s = v.seat, o = 1 - s;
+  let body = '<h3>' + esc(resultTitle(res)) + '</h3>';
+  if (res.type === 'draw') body += '<p>' + esc(T('drawExpl')) + '</p>';
+  else {
+    const k = res.by, d = 1 - k, kn = nameOf(v, k), dn = nameOf(v, d);
+    const ptsTxt = res.type === 'gin' ? T('calcGin', res.dDW) : res.type === 'biggin' ? T('calcBigGin', res.dDW) : res.undercut ? T('calcUnder', res.kDW, res.dDW) : T('calcKnock', res.dDW, res.kDW);
+    body += '<div class="big">' + esc(nameOf(v, res.winner)) + ' ' + iso('+' + res.pts) + '</div><p class="muted" style="text-align:center">' + esc(ptsTxt) + '</p>';
+    body += '<div class="side"><div class="nm"><b>' + esc(kn) + ' · ' + esc(res.type === 'knock' ? T('knocked') : T('ginLbl')) + '</b><span>' + esc(T('deadwood')) + ' ' + res.kDW + '</span></div>' + meldsHTML(res.kMelds, res.kDead, res.laid) + '</div>';
+    body += '<div class="side"><div class="nm"><b>' + esc(dn) + '</b><span>' + esc(T('deadwood')) + ' ' + res.dDW + (res.laid.length ? ' · ' + esc(T('laidOff', res.laid.length)) : '') + '</span></div>' + meldsHTML(res.dMelds, res.dDead, null) + '</div>';
+  }
+  body += '<p style="text-align:center;font-size:18px">' + esc(T('scoreLine')) + ' ' + iso(nameOf(v, s) + ' ' + v.scores[s] + ' : ' + v.scores[o] + ' ' + nameOf(v, o)) + '</p>';
+  body += '<div id="readyLine" class="muted" style="text-align:center;min-height:20px"></div><div class="row"><button class="btn" data-x>' + esc(T('viewTable')) + '</button><button class="btn main" data-n>' + esc(v.over ? T('matchOver') : (G.mode === 'online' ? T('ready') : T('nextHand'))) + '</button></div>';
+  const ov = overlay(body, 'res');
+  ov.querySelector('.box').classList.add('res');
+  ov.querySelector('[data-x]').onclick = () => { G.resSeen = true; closeOv(ov); renderGame(); };
+  ov.querySelector('[data-n]').onclick = () => { if (v.over) { closeOv(ov); showFinal(v); } else nextHandAsk(ov); };
+  renderReadyLine();
+}
+function nextHandAsk(ov) {
+  if (G.mode === 'online') { netReady(); return; }
+  closeAllOv(); G.resSeen = false;
+  GIN.nextHand(G.M); NEWC = null; SEL = null; G.viewer = null;
+  if (G.mode === 'two') PASS_ON = true;
+  afterChange(true);
+}
+function showScores(v) {
+  let rows = v.hist.map(h => '<tr><td>' + h.n + '</td><td>' + esc(h.type === 'draw' ? T('rDraw') : h.type === 'knock' ? (h.undercut ? T('undercutS') : T('knockS')) : T('ginS')) + '</td><td>' + (h.winner === v.seat ? '+' + h.pts : '') + '</td><td>' + (h.winner === 1 - v.seat ? '+' + h.pts : '') + '</td></tr>').join('');
+  const o = overlay('<h3>' + esc(T('scores')) + '</h3><table class="tbl"><tr><th>#</th><th></th><th>' + esc(nameOf(v, v.seat)) + '</th><th>' + esc(nameOf(v, 1 - v.seat)) + '</th></tr>' + rows +
+    '<tr><th></th><th>' + esc(T('total')) + '</th><th>' + v.scores[v.seat] + '</th><th>' + v.scores[1 - v.seat] + '</th></tr></table><p class="muted">' + esc(T('toN', v.target)) + (v.bonuses ? ' · ' + esc(T('withBonuses')) : '') + '</p><div class="row"><button class="btn main" data-c>' + esc(T('close')) + '</button></div>', 'center');
+  o.querySelector('[data-c]').onclick = () => closeOv(o);
+}
+function showFinal(v) {
+  closeAllOv();
+  const f = v.final, s = v.seat, o = 1 - s, won = v.winner === s;
+  const head = G.mode === 'two' ? T('winsX', nameOf(v, v.winner)) : won ? T('youWon') : T('youLost');
+  let t = '<table class="tbl"><tr><th></th><th>' + esc(nameOf(v, s)) + '</th><th>' + esc(nameOf(v, o)) + '</th></tr>' +
+    '<tr><td>' + esc(T('points')) + '</td><td>' + f.scores[s] + '</td><td>' + f.scores[o] + '</td></tr>';
+  if (v.bonuses) t += '<tr><td>' + esc(T('gameBonus')) + '</td><td>' + f.game[s] + '</td><td>' + f.game[o] + '</td></tr><tr><td>' + esc(T('boxBonus')) + '</td><td>' + f.box[s] + '</td><td>' + f.box[o] + '</td></tr>' + (f.shutout ? '<tr><td colspan="3">' + esc(T('shutout')) + '</td></tr>' : '');
+  t += '<tr><th>' + esc(T('total')) + '</th><th>' + f.total[s] + '</th><th>' + f.total[o] + '</th></tr></table>';
+  const ov = overlay('<div style="font-size:54px;text-align:center">' + (won || G.mode === 'two' ? '🏆' : '🃏') + '</div><h3 style="text-align:center">' + esc(head) + '</h3>' + t +
+    (G.hints ? '<p class="muted" style="text-align:center">' + esc(T('hintsUsed', G.hints)) + '</p>' : '') +
+    '<div id="readyLine" class="muted" style="text-align:center;min-height:20px"></div><div class="row" style="margin-top:10px"><button class="btn" data-h>' + esc(T('home')) + '</button><button class="btn main" data-r>' + esc(T('rematch')) + '</button></div>', 'center');
+  ov.querySelector('[data-h]').onclick = () => { closeOv(ov); leaveGame(); };
+  ov.querySelector('[data-r]').onclick = () => { if (G.mode === 'online') { netReady(); return; } closeOv(ov); rematch(); };
+  renderReadyLine();
+}
+function rematch() {
+  const M0 = G.M;
+  const M = GIN.newMatch({ target: M0.target, bonuses: M0.bonuses, bigGin: M0.bigGin, names: M0.names.slice(), dealer: 1 - M0.H.dealer });
+  G.M = M; G.id = Date.now(); G.hints = 0; G.resSeen = false; G.viewer = null; NEWC = null; SEL = null;
+  if (G.mode === 'two') PASS_ON = true;
+  afterChange(true);
+}
+function leaveGame() {
+  clearTimeout(aiT); closeAllOv(); hidePass();
+  if (G && G.mode === 'online') { netLeave(); return; }
+  if (G && G.M && G.M.over) { G = null; saveGame(); }
+  show('home'); renderHome();
+}
+function gameMenu() {
+  const v = curView(); if (!v) return;
+  const o = overlay('<h3>' + esc(T('menu')) + '</h3><div class="phr">' +
+    '<button data-k="sort">↕ ' + esc(T('sortBy')) + ': ' + esc(T('sort_' + ST.sort)) + '</button>' +
+    '<button data-k="scores">📋 ' + esc(T('scores')) + '</button>' +
+    '<button data-k="rules">📖 ' + esc(T('rules')) + '</button>' +
+    '<button data-k="skin">' + (ST.skin === 'tiles' ? '🃏 ' + esc(T('useCards')) : '🀄 ' + esc(T('useTiles'))) + '</button>' +
+    '<button data-k="sound">' + (ST.sound ? '🔇 ' + esc(T('soundOff')) : '🔊 ' + esc(T('soundOn'))) + '</button>' +
+    '<button data-k="big">⛶ ' + esc(T('bigTable')) + '</button>' +
+    (G.mode !== 'online' && !v.over ? '<button data-k="quit">🏳 ' + esc(T('quitMatch')) + '</button>' : '') +
+    '</div><div class="row" style="margin-top:10px"><button class="btn main" data-k="close">' + esc(T('close')) + '</button></div>');
+  o.addEventListener('click', e => {
+    const k = e.target.closest('[data-k]'); if (!k) return; const key = k.dataset.k;
+    closeOv(o);
+    if (key === 'sort') { ST.sort = { melds: 'suit', suit: 'rank', rank: 'melds' }[ST.sort]; saveST(); renderGame(); }
+    else if (key === 'scores') showScores(v);
+    else if (key === 'rules') { renderRules(); show('rules'); RULES_BACK = 'game'; }
+    else if (key === 'skin') { ST.skin = ST.skin === 'tiles' ? 'cards' : 'tiles'; saveST(); applyLook(); renderGame(); }
+    else if (key === 'sound') { ST.sound = !ST.sound; saveST(); }
+    else if (key === 'big') bigTable();
+    else if (key === 'quit') confirmBox(T('quitQ'), T('quitMatch'), () => { G = null; saveGame(); show('home'); renderHome(); });
+  });
+}
+async function bigTable() {
+  try { await document.documentElement.requestFullscreen(); await screen.orientation.lock('landscape'); } catch (e) { toast(T('bigTableNo')); }
+  setTimeout(renderGame, 300);
+}
+function bindGame() {
+  bindHand();
+  $('#pStock').onclick = tapStock; $('#pDisc').onclick = tapDiscard;
+  $('#pStock').onkeydown = e => { if (e.key === 'Enter') tapStock(); }; $('#pDisc').onkeydown = e => { if (e.key === 'Enter') tapDiscard(); };
+  $('#bA').onclick = btnA; $('#bB').onclick = btnB; $('#bHint').onclick = hint;
+  $('#gBack').onclick = leaveGame; $('#gMenu').onclick = gameMenu;
+  $('#mySort').onclick = () => { ST.sort = { melds: 'suit', suit: 'rank', rank: 'melds' }[ST.sort]; saveST(); renderGame(); };
+  window.addEventListener('resize', () => { if (SCREEN === 'game') renderGame(); });
+}
+
+/* ---- online.js ---- */
+/* =====================================================================
+   RummyNest — online (NestLink 1.1). The host holds the whole match and
+   sends the friend only their own view; the friend sends intents.
+   ===================================================================== */
+let LINK = null, subT = null;
+function initLink() {
+  LINK = NestLink.create({
+    app: 'rummynest', version: APP_VERSION, maxPlayers: 2,
+    name: () => ST.name || T('player'),
+    persist: sess => { if (G && G.mode === 'online') { G.net.sess = sess; if (sess && sess.seat != null) G.net.seat = sess.seat; saveGame(); } },
+    onStatus: () => { renderNet(); if (SCREEN === 'lobby') renderLobby(); },
+    onCode: () => { if (SCREEN === 'lobby') renderLobby(); },
+    onJoin: seat => { if (!isHostOnline()) return; LINK.sendTo(seat, { type: 'lobby', cfg: G.cfg }); if (G.M) netBroadcast(); },
+    onRoster: () => {
+      if (isHostOnline()) {
+        if (G.M && rosterOnline(1)) { if (G.sub) { G.sub = false; toast(T('friendBack', nameAt(1))); } G.offSince = null; G.M.names[1] = nameAt(1) || G.M.names[1]; netBroadcast(); }
+      }
+      if (SCREEN === 'lobby') renderLobby(); else renderGame();
+    },
+    onMessage: (m, from) => netMsg(m, from),
+    onEmoji: (e, from) => bubble(from, e),
+    onTalk: (seat, on) => { if (seat !== LINK.seat) { const st = $('#oStat'); if (st && on) st.textContent = '🎙 ' + T('talking'); else renderGame(); } },
+    onVoiceMsg: (url, sec, seat, mine) => voiceMsg(url, sec, seat, mine),
+    onRecState: on => { const b = $('#vRec'); if (b) { b.classList.toggle('on', on); b.textContent = on ? '⏹ ' + T('stop') : '⏺'; } },
+    onMicError: () => toast(T('micDenied'), 4000),
+    onAudioBlocked: () => toast(T('tapToHear'), 4000),
+    onVersion: () => toast(T('versionDiff'), 5000)
+  });
+}
+const nameAt = s => { const p = LINK && LINK.roster.find(x => x.seat === s); return p ? p.name : ''; };
+function rosterOnline(s) { if (!LINK) return false; const p = LINK.roster.find(x => x.seat === s); return !!(p && p.online); }
+
+/* ---------- lobby ---------- */
+function openOnline(code) {
+  show('lobby');
+  if (code && (!G || G.mode !== 'online')) { netJoin(code); return; }
+  renderLobby();
+}
+function netHost() {
+  G = { mode: 'online', net: { role: 'host', seat: 0 }, cfg: { target: ST.target, bonuses: ST.bonuses, bigGin: ST.bigGin }, id: Date.now(), counted: {}, ready: [false, false], hints: 0 };
+  saveGame(); LINK.host(); renderLobby();
+}
+function netJoin(code) {
+  code = String(code || '').trim().toUpperCase(); if (code.length < 4) { toast(T('codeShort')); return; }
+  G = { mode: 'online', net: { role: 'guest', seat: null }, v: null, id: Date.now(), counted: {}, hints: 0 };
+  saveGame(); LINK.join(code); renderLobby();
+}
+function statusTxt() {
+  const st = LINK ? LINK.status : 'off';
+  return { off: T('stOff'), connecting: T('stConnecting'), waiting: T('stWaiting'), open: T('stOpen'), reconnecting: T('stRecon'), notfound: T('stNotFound'), error: T('stError'), full: T('stFull') }[st] || st;
+}
+function renderLobby() {
+  const b = $('#lobbyBody'); if (!b) return;
+  if (!G || G.mode !== 'online') {
+    b.innerHTML = '<div class="card"><h3>' + esc(T('hostTitle')) + '</h3><p class="muted">' + esc(T('hostSub')) + '</p><button class="btn main" id="lHost" style="width:100%">' + esc(T('createRoom')) + '</button></div>' +
+      '<div class="card"><h3>' + esc(T('joinTitle')) + '</h3><label class="f" for="lCode">' + esc(T('roomCode')) + '</label><input class="in" id="lCode" maxlength="6" autocapitalize="characters" autocomplete="off" style="text-transform:uppercase;letter-spacing:.2em;text-align:center;font-size:22px;direction:ltr"><button class="btn main" id="lJoin" style="width:100%;margin-top:10px">' + esc(T('join')) + '</button></div>' +
+      '<div class="card"><label class="f" for="lName">' + esc(T('yourName')) + '</label><input class="in" id="lName" maxlength="20" value="' + esc(ST.name) + '"><p class="muted">' + esc(T('onlineNote')) + '</p></div>';
+    $('#lHost').onclick = () => { saveName(); netHost(); };
+    $('#lJoin').onclick = () => { saveName(); netJoin($('#lCode').value); };
+    $('#lCode').onkeydown = e => { if (e.key === 'Enter') $('#lJoin').click(); };
+    return;
+  }
+  const host = !isGuest(), code = LINK.session ? LINK.session.code : '', st = LINK.status;
+  const ros = (LINK.roster || []).map(p => '<div><span class="dot ' + (p.online ? 'on' : '') + '" style="width:10px;height:10px;border-radius:50%;background:' + (p.online ? '#46d07a' : '#888') + '"></span><b>' + esc(p.name || T('player')) + '</b>' + (p.seat === 0 ? ' <span class="muted">· ' + esc(T('hostLbl')) + '</span>' : '') + (p.seat === LINK.seat ? ' <span class="muted">· ' + esc(T('youLbl')) + '</span>' : '') + '</div>').join('');
+  let h = '<div class="card" style="text-align:center"><div class="muted">' + esc(T('roomCode')) + '</div><div class="code">' + esc(code || '·····') + '</div><div class="muted" aria-live="polite">' + esc(statusTxt()) + '</div>';
+  if (host && code) h += '<div class="row" style="margin-top:10px"><button class="btn main" id="lWa">💬 ' + esc(T('inviteWa')) + '</button><button class="btn" id="lCopy">🔗 ' + esc(T('copyLink')) + '</button></div>';
+  h += '</div><div class="card"><h3>' + esc(T('players')) + '</h3><div class="roster">' + (ros || '<div class="muted">' + esc(T('noOneYet')) + '</div>') + '</div></div>';
+  const cfg = G.cfg || (G.v && { target: G.v.target, bonuses: G.v.bonuses, bigGin: G.v.bigGin }) || {};
+  if (host) {
+    h += '<div class="card"><h3>' + esc(T('gameRules')) + '</h3><label class="f">' + esc(T('target')) + '</label><div class="seg" id="lTarget">' + [50, 100, 150, 250].map(t => '<button data-v="' + t + '" class="' + (cfg.target === t ? 'on' : '') + '">' + t + '</button>').join('') + '</div>' +
+      '<div class="sw ' + (cfg.bonuses ? 'on' : '') + '" data-k="bonuses"><div class="t">' + esc(T('bonuses')) + '<small>' + esc(T('bonusesSub')) + '</small></div><div class="tg"></div></div>' +
+      '<div class="sw ' + (cfg.bigGin ? 'on' : '') + '" data-k="bigGin"><div class="t">' + esc(T('bigGin')) + '<small>' + esc(T('bigGinSub')) + '</small></div><div class="tg"></div></div></div>';
+    const two = (LINK.roster || []).filter(p => p.online).length >= 2;
+    h += G.M ? '<button class="btn main" id="lBack" style="width:100%">' + esc(T('backToGame')) + '</button>' : '<button class="btn main" id="lStart" style="width:100%" ' + (two ? '' : 'disabled') + '>' + esc(two ? T('startGame') : T('waitFriend')) + '</button>';
+  } else {
+    h += '<div class="card"><h3>' + esc(T('gameRules')) + '</h3><p>' + esc(cfgTxt(cfg)) + '</p><p class="muted">' + esc(G.v ? '' : T('waitHostStart')) + '</p></div>';
+    if (G.v) h += '<button class="btn main" id="lBack" style="width:100%">' + esc(T('backToGame')) + '</button>';
+  }
+  h += '<button class="btn" id="lLeave" style="width:100%;margin-top:10px">🚪 ' + esc(T('leaveRoom')) + '</button>';
+  b.innerHTML = h;
+  const link = LINK.inviteURL();
+  if ($('#lWa')) $('#lWa').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(T('waText', code) + '\n' + link), '_blank');
+  if ($('#lCopy')) $('#lCopy').onclick = async () => { try { await navigator.clipboard.writeText(link); toast(T('copied')); } catch (e) { toast(link, 5000); } };
+  if ($('#lTarget')) $('#lTarget').onclick = e => { const v = e.target.closest('[data-v]'); if (!v) return; G.cfg.target = +v.dataset.v; saveGame(); sendCfg(); renderLobby(); };
+  $$('#lobbyBody .sw[data-k]').forEach(sw => sw.onclick = () => { G.cfg[sw.dataset.k] = !G.cfg[sw.dataset.k]; saveGame(); sendCfg(); renderLobby(); });
+  if ($('#lStart')) $('#lStart').onclick = netStart;
+  if ($('#lBack')) $('#lBack').onclick = () => show('game');
+  $('#lLeave').onclick = netLeave;
+}
+const cfgTxt = c => T('toN', c.target || 100) + ' · ' + (c.bonuses ? T('withBonuses') : T('noBonuses')) + (c.bigGin ? ' · ' + T('bigGin') : '');
+function sendCfg() { if (isHostOnline() && !G.M) LINK.send({ type: 'lobby', cfg: G.cfg }); }
+function saveName() { const n = $('#lName'); if (n) { ST.name = n.value.trim().slice(0, 20); saveST(); } }
+
+/* ---------- host: run the match ---------- */
+function netStart() {
+  if (!isHostOnline()) return;
+  G.M = GIN.newMatch({ target: G.cfg.target, bonuses: G.cfg.bonuses, bigGin: G.cfg.bigGin, names: [ST.name || T('player'), nameAt(1) || T('friend')], dealer: Math.random() < .5 ? 0 : 1 });
+  G.id = Date.now(); G.ready = [false, false]; G.sub = false; G.resSeen = false; NEWC = null; SEL = null;
+  show('game'); afterChange(true);
+}
+function netBroadcast() {
+  if (!isHostOnline() || !G.M || !LINK.session) return;
+  if (!LINK.roster.some(p => p.seat === 1)) return;
+  const v = GIN.view(G.M, 1);
+  if (G.M.H.phase === 'end') v.replay = { seed: G.M.H.seed, dealer: G.M.H.dealer, log: G.M.H.log.slice() };   // public once the hand is over
+  LINK.sendTo(1, { type: 'view', v, sub: !!G.sub, ready: G.ready, mid: G.id });
+  // only the newest full view matters — blank older ones (keeps the saved session small, numbering intact)
+  const lk = LINK.session.links && LINK.session.links[1];
+  if (lk && lk.out) { let seen = false; for (let i = lk.out.length - 1; i >= 0; i--) { const d = lk.out[i].d; if (d && d.type === 'view') { if (seen) lk.out[i].d = { type: 'x' }; seen = true; } } }
+}
+function netMsg(m, from) {
+  if (!G || G.mode !== 'online' || !m) return;
+  if (isHostOnline()) {
+    if (from !== 1) return;
+    if (m.type === 'act') {
+      if (G.M && !G.sub && GIN.legal(G.M, 1, m.a)) {
+        const top = G.M.H.discard[G.M.H.discard.length - 1];
+        GIN.apply(G.M, 1, m.a);
+        G.last = { s: 1, a: m.a.a, c: m.a.a === 'take' ? top : (m.a.c != null ? m.a.c : null) };
+        if (m.a.a === 'take') fly($('#pDisc'), $('#oHand'), top); else if (m.a.a === 'draw') fly($('#pStock'), $('#oHand'), null, true); else if (m.a.c != null) fly($('#oHand'), $('#pDisc'), m.a.c);
+        beep(m.a.a === 'knock' ? 'knock' : 'card');
+        afterChange();
+        if (G.M.H.phase !== 'end' && G.M.H.turn === 0) { beep('turn'); buzz(20); }
+      } else netBroadcast();                                   // illegal / stale → resend the truth
+    } else if (m.type === 'ready') { G.ready[1] = true; saveGame(); maybeAdvance(); netBroadcast(); renderReadyLine(); }
+    else if (m.type === 'hello') netBroadcast();
+    return;
+  }
+  // guest
+  if (m.type === 'lobby') { G.cfg = m.cfg; saveGame(); if (SCREEN === 'lobby') renderLobby(); return; }
+  if (m.type === 'view') {
+    const prev = G.v, v = m.v;
+    if (!prev || prev.handNo !== v.handNo || G.mid !== m.mid) { G.resSeen = false; SEL = null; NEWC = null; closeAllOv(); G.readyMine = false; }
+    else if (v.hand.length > prev.hand.length) NEWC = v.hand.find(c => !prev.hand.includes(c));
+    else if (v.hand.length < prev.hand.length) NEWC = null;
+    if (prev && v.log.length > prev.log.length && v.log[v.log.length - 1][0] !== v.seat) beep(v.log[v.log.length - 1][1] === 'knock' ? 'knock' : 'card');
+    if (prev && prev.turn !== v.turn && v.turn === v.seat && v.phase !== 'end') { beep('turn'); buzz(20); }
+    G.v = v; G.mid = m.mid; G.sub = m.sub; G.ready = m.ready || [false, false]; BUSY = false;
+    if (!G.ready[1]) G.readyMine = false;
+    if (v.phase === 'end' && !G.counted[G.mid + ':' + v.handNo]) {
+      G.counted[G.mid + ':' + v.handNo] = 1;
+      const res = v.res;
+      if (res.type === 'gin' || res.type === 'biggin') beep('gin'); else if (res.type === 'knock') beep('knock');
+      const R = LS.get('replays', []);
+      // the guest never saw the deck — a replay needs the host's seed + moves, which only become public after the hand
+      if (v.replay) { R.unshift(Object.assign({ d: Date.now(), mode: 'online', names: v.names.slice(), seat: v.seat, bigGin: v.bigGin, type: res.type, winner: res.winner, pts: res.pts || 0, undercut: !!res.undercut }, v.replay)); R.length = Math.min(R.length, 10); LS.set('replays', R); }
+      const gm = { over: v.over, winner: v.winner, final: v.final }; G.id = G.mid;
+      addStats(res, v.seat, gm);
+    }
+    saveGame();
+    if (SCREEN === 'lobby') show('game'); else renderGame();
+    renderReadyLine();
+  }
+}
+/* ready between hands / for a rematch */
+function netReady() {
+  if (isHostOnline()) { G.ready[0] = true; saveGame(); maybeAdvance(); netBroadcast(); renderReadyLine(); return; }
+  G.readyMine = true; LINK.sendTo(0, { type: 'ready' }); saveGame(); renderReadyLine();
+}
+function maybeAdvance(force) {
+  if (!isHostOnline() || !G.M || G.M.H.phase !== 'end') return;
+  const friendIn = rosterOnline(1) && !G.sub;
+  if (!G.ready[0] || (!G.ready[1] && friendIn && !force)) return;
+  G.ready = [false, false]; G.resSeen = false; NEWC = null; SEL = null; closeAllOv();
+  if (G.M.over) {
+    const M0 = G.M; G.M = GIN.newMatch({ target: M0.target, bonuses: M0.bonuses, bigGin: M0.bigGin, names: [ST.name || T('player'), nameAt(1) || M0.names[1]], dealer: 1 - M0.H.dealer });
+    G.id = Date.now(); G.hints = 0;
+  } else GIN.nextHand(G.M);
+  afterChange(true);
+}
+function renderReadyLine() {
+  const el = $('#readyLine'); if (!el || !G || G.mode !== 'online') return;
+  const v = curView(); if (!v) return;
+  const me = v.seat, o = 1 - me, r = G.ready || [false, false];
+  const mine = isGuest() ? (G.readyMine || r[1]) : r[0], theirs = isGuest() ? r[0] : r[1];
+  let t = (mine ? '✓ ' + T('youReady') : '') + (mine && !theirs ? ' · ' : '') + (theirs ? ' ✓ ' + T('xReady', nameOf(v, o)) : (mine ? T('waitingX', nameOf(v, o)) : ''));
+  el.innerHTML = esc(t) + (isHostOnline() && mine && !theirs && !rosterOnline(1) ? ' <button class="btn" id="goNoWait" style="min-height:40px;margin-top:6px">' + esc(T('startNoWait')) + '</button>' : '');
+  const gw = $('#goNoWait'); if (gw) gw.onclick = () => maybeAdvance(true);
+  $$('#ovs [data-n],#ovs [data-r]').forEach(b => { if (mine) { b.disabled = true; b.textContent = '✓ ' + T('ready'); } });
+}
+/* a friend gone for 30 s: the computer plays for them (host only) until they're back */
+function subWatch() {
+  clearInterval(subT);
+  subT = setInterval(() => {
+    if (!isHostOnline() || !G.M || G.M.over) return;
+    if (rosterOnline(1)) { G.offSince = null; return; }
+    if (!LINK.roster.some(p => p.seat === 1)) return;
+    G.offSince = G.offSince || Date.now();
+    if (!G.sub && Date.now() - G.offSince > 30000) { G.sub = true; saveGame(); toast(T('cpuStandIn', G.M.names[1]), 4500); renderGame(); scheduleAI(); }
+    if (G.sub && G.M.H.phase === 'end' && G.ready[0]) maybeAdvance(true);
+    if (G.sub) scheduleAI();
+  }, 2000);
+}
+function netAct(a) { LINK.sendTo(0, { type: 'act', a }); }
+function netLeave() {
+  confirmBox(T('leaveQ'), T('leaveRoom'), () => { LINK.close(); G = null; saveGame(); closeAllOv(); show('home'); renderHome(); });
+}
+function renderNet() {
+  const on = G && G.mode === 'online';
+  $('#voice').classList.toggle('hide', !on);
+  const n = $('#gNet'); if (!n) return;
+  if (!on) { n.classList.add('hide'); return; }
+  const st = LINK.status; n.classList.toggle('hide', st === 'open');
+  n.classList.toggle('bad', st !== 'open' && st !== 'waiting');
+  n.textContent = statusTxt();
+  $('#vPtt').textContent = '🎙 ' + T('holdTalk');
+  $('#vOpen').classList.toggle('on', LINK.openMic);
+}
+
+/* ---------- voice, emoji, quick messages ---------- */
+function bubble(seat, text, cls) {
+  const L = $('#bubbles'); if (!L || SCREEN !== 'game') return;
+  const v = curView(); const mine = v && seat === v.seat;
+  const anchor = mine ? $('#hand') : $('#opp'); if (!anchor) return;
+  const r = anchor.getBoundingClientRect(), single = /^\p{Extended_Pictographic}(\uFE0F|\u200D\p{Extended_Pictographic})*$/u.test(text);
+  const b = document.createElement('div'); b.className = 'bub ' + (single ? 'emo ' : '') + (cls || '');
+  b.innerHTML = single ? esc(text) : '<small>' + esc(v ? nameOf(v, seat) : '') + '</small>' + esc(text);
+  L.appendChild(b);
+  const bw = b.offsetWidth, x = Math.max(8, Math.min(innerWidth - bw - 8, r.left + r.width / 2 - bw / 2));
+  b.style.left = x + 'px'; b.style.top = Math.max(8, mine ? r.top - b.offsetHeight - 6 : r.bottom + 4) + 'px';
+  setTimeout(() => b.remove(), single ? 3500 : 6000);
+}
+function sendEmo(e) { if (!LINK) return; LINK.emoji(e); bubble(LINK.seat, e); }
+function emoPanel() {
+  const E = ['👍', '😂', '😮', '😅', '🔥', '👏', '😬', '🙈'], PH = ['phNice', 'phHurry', 'phLucky', 'phOops', 'phAgain', 'phGG'];
+  const o = overlay('<div class="emogrid">' + E.map(e => '<button data-e="' + e + '">' + e + '</button>').join('') + '</div><div class="phr">' + PH.map(k => '<button data-e="' + esc(T(k)) + '">' + esc(T(k)) + '</button>').join('') + '</div><div class="row" style="margin-top:10px"><button class="btn" data-c>' + esc(T('close')) + '</button></div>');
+  o.addEventListener('click', e => { const b = e.target.closest('[data-e]'); if (b) { sendEmo(b.dataset.e); closeOv(o); } else if (e.target.closest('[data-c]')) closeOv(o); });
+}
+function voiceMsg(url, sec, seat, mine) {
+  const L = $('#bubbles'); const v = curView(); if (!L) return;
+  const a = new Audio(url); if (!mine) { const p = a.play(); if (p && p.catch) p.catch(() => toast(T('tapToHear'))); }
+  const anchor = v && seat === v.seat ? $('#hand') : $('#opp'); if (!anchor) return;
+  const r = anchor.getBoundingClientRect(), b = document.createElement('div'); b.className = 'bub'; b.style.pointerEvents = 'auto';
+  b.innerHTML = '<small>' + esc(v ? nameOf(v, seat) : '') + '</small><span class="vmsg"><button class="btn" style="min-height:36px;padding:4px 10px">▶</button> 🎤 ' + iso(sec.toFixed(1) + 's') + '</span>';
+  b.querySelector('button').onclick = () => { a.currentTime = 0; a.play(); };
+  L.appendChild(b); b.style.left = Math.max(8, Math.min(innerWidth - b.offsetWidth - 8, r.left + 10)) + 'px'; b.style.top = (seat === (v && v.seat) ? r.top - b.offsetHeight - 6 : r.bottom + 4) + 'px';
+  setTimeout(() => b.remove(), 15000);
+}
+function bindVoice() {
+  const p = $('#vPtt');
+  const on = e => { e.preventDefault(); p.classList.add('on'); LINK.talk(true); }, off = () => { if (!p.classList.contains('on')) return; p.classList.remove('on'); LINK.talk(false); };
+  p.addEventListener('pointerdown', on); p.addEventListener('pointerup', off); p.addEventListener('pointerleave', off); p.addEventListener('pointercancel', off);
+  p.oncontextmenu = e => e.preventDefault();
+  $('#vOpen').onclick = async () => { const want = !LINK.openMic; await LINK.setOpenMic(want); $('#vOpen').classList.toggle('on', LINK.openMic); toast(LINK.openMic ? T('openMicOn') : T('openMicOff')); };
+  $('#vRec').onclick = () => { if (LINK.recording) LINK.recStop(); else LINK.recStart(20); };
+  $('#vEmo').onclick = emoPanel;
+}
+
+/* ---- screens.js ---- */
+/* =====================================================================
+   RummyNest — home · settings · stats · replays · rules · about · tour · init
+   ===================================================================== */
+let RULES_BACK = 'home';
+/* the rummy family — only variants whose engine is finished are listed */
+const VARIANTS = [{ id: 'gin', name: 'gin', sub: 'ginSub' }];
+
+function renderHome() {
+  applyLang();
+  $('#verLbl').textContent = 'v' + APP_VERSION;
+  const fan = [12, 25, 38, 51].map((c, i) => cardHTML([0, 13, 26, 39][i] + [0, 11, 12, 10][i], '', 'style="--w:54px;transform:translateX(-50%) rotate(' + (-24 + i * 16) + 'deg)"')).join('');
+  $('#heroFan').innerHTML = fan;
+  $('#vgrid').innerHTML = VARIANTS.map(x => '<button class="vcard ' + (ST.variant === x.id ? 'on' : '') + '" data-v="' + x.id + '"><b>' + esc(T(x.name)) + '</b><span>' + esc(T(x.sub)) + '</span></button>').join('');
+  const c = $('#mCont'), g = G;
+  if (g && ((g.M && !g.M.over) || g.mode === 'online')) {
+    c.classList.remove('hide');
+    $('#mContSub').textContent = g.mode === 'online' ? T('online') + (LINK && LINK.session ? ' · ' + LINK.session.code : '') : g.mode === 'two' ? T('twoPhone') : T('vsCpu') + ' · ' + T(LVL[g.level]);
+  } else c.classList.add('hide');
+}
+function chooseLevel() {
+  const o = overlay('<h3>' + esc(T('chooseLevel')) + '</h3><div class="lvls">' + LVL.map((k, i) => '<button class="btn ' + (ST.level === i ? 'main' : '') + '" data-l="' + i + '">' + esc(T(k)) + '</button>').join('') + '</div><p class="muted">' + esc(T('levelNote')) + '</p>' + quickRules() + '<div class="row" style="margin-top:8px"><button class="btn ghosty" data-c>' + esc(T('cancel')) + '</button></div>');
+  o.addEventListener('click', e => { const b = e.target.closest('[data-l]'); if (b) { closeOv(o); if (G && G.M && !G.M.over && G.mode !== 'online') confirmBox(T('replaceQ'), T('newGame'), () => startCpu(+b.dataset.l)); else startCpu(+b.dataset.l); } else if (e.target.closest('[data-c]')) closeOv(o); });
+}
+function quickRules() { return '<p class="muted" style="margin:8px 0 0">' + esc(cfgTxt({ target: ST.target, bonuses: ST.bonuses, bigGin: ST.bigGin })) + ' · <a href="#" id="qrSet" style="color:var(--acc)">' + esc(T('change')) + '</a></p>'; }
+function askTwo() {
+  const o = overlay('<h3>' + esc(T('twoPhone')) + '</h3><label class="f">' + esc(T('player1')) + '</label><input class="in" id="tn1" maxlength="20" value="' + esc(ST.name || T('player1')) + '"><label class="f">' + esc(T('player2')) + '</label><input class="in" id="tn2" maxlength="20" value="' + esc(LS.get('p2', T('player2'))) + '">' + quickRules() + '<div class="row" style="margin-top:12px"><button class="btn ghosty" data-c>' + esc(T('cancel')) + '</button><button class="btn main" data-g>' + esc(T('startGame')) + '</button></div>');
+  o.querySelector('[data-c]').onclick = () => closeOv(o);
+  o.querySelector('[data-g]').onclick = () => { const a = $('#tn1').value.trim() || T('player1'), b = $('#tn2').value.trim() || T('player2'); LS.set('p2', b); closeOv(o); startTwo(a, b); };
+}
+document.addEventListener('click', e => { if (e.target.id === 'qrSet') { e.preventDefault(); closeAllOv(); renderSettings(); show('settings'); } });
+
+/* ---------- settings ---------- */
+function sw(k, label, sub) { return '<div class="sw ' + (ST[k] ? 'on' : '') + '" data-k="' + k + '" role="switch" aria-checked="' + !!ST[k] + '" tabindex="0"><div class="t">' + esc(label) + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</div><div class="tg"></div></div>'; }
+function seg(k, opts) { return '<div class="seg" data-seg="' + k + '">' + opts.map(([v, l]) => '<button data-v="' + v + '" class="' + (String(ST[k]) === String(v) ? 'on' : '') + '">' + esc(l) + '</button>').join('') + '</div>'; }
+function renderSettings() {
+  const b = $('#setBody');
+  b.innerHTML =
+    '<div class="card"><h3>' + esc(T('profile')) + '</h3><label class="f" for="sName">' + esc(T('yourName')) + '</label><input class="in" id="sName" maxlength="20" value="' + esc(ST.name) + '"><label class="f" for="sLang">' + esc(T('language')) + '</label><select class="in" id="sLang">' + Object.keys(LANGS).map(k => '<option value="' + k + '" ' + (ST.lang === k ? 'selected' : '') + '>' + LANGS[k] + '</option>').join('') + '</select></div>' +
+    '<div class="card"><h3>' + esc(T('look')) + '</h3><label class="f">' + esc(T('theme')) + '</label><div class="swatches">' + THEMES.map(t => '<button class="swatch ' + (ST.theme === t ? 'on' : '') + '" data-theme-pick="' + t + '" style="background:' + THEME_COL[t] + '" aria-label="' + t + '"></button>').join('') + '</div>' +
+    '<label class="f">' + esc(T('dayNight')) + '</label>' + seg('mode', [['night', '🌙 ' + T('night')], ['day', '☀️ ' + T('day')]]) +
+    '<label class="f">' + esc(T('tableColor')) + '</label>' + seg('board', [['felt', T('bFelt')], ['wood', T('bWood')], ['blue', T('bBlue')], ['contrast', T('bContrast')], ['theme', T('bTheme')]]) +
+    '<label class="f">' + esc(T('pieces')) + '</label>' + seg('skin', [['cards', '🃏 ' + T('cards')], ['tiles', '🀄 ' + T('tiles')]]) +
+    '<div id="skinPrev" style="display:flex;gap:6px;direction:ltr;justify-content:center;margin:10px 0">' + [0, 14, 27, 51, 39].map(c => cardHTML(c, '', 'style="--w:44px"')).join('') + '</div>' +
+    sw('four', T('fourColor'), T('fourColorSub')) + '</div>' +
+    '<div class="card"><h3>' + esc(T('play')) + '</h3><label class="f">' + esc(T('sortBy')) + '</label>' + seg('sort', [['melds', T('sort_melds')], ['suit', T('sort_suit')], ['rank', T('sort_rank')]]) +
+    sw('oneTap', T('oneTap'), T('oneTapSub')) + sw('memory', T('memoryAid'), T('memoryAidSub')) + sw('sound', T('sound')) + sw('vib', T('vibration')) + '</div>' +
+    '<div class="card"><h3>' + esc(T('gameRules')) + '</h3><p class="muted">' + esc(T('rulesForNew')) + '</p><label class="f">' + esc(T('target')) + '</label>' + seg('target', [[50, '50'], [100, '100'], [150, '150'], [250, '250']]) +
+    sw('bonuses', T('bonuses'), T('bonusesSub')) + sw('bigGin', T('bigGin'), T('bigGinSub')) + '</div>' +
+    '<div class="card"><h3>' + esc(T('data')) + '</h3><div class="row"><button class="btn" id="sBackup">⬇️ ' + esc(T('backup')) + '</button><label class="btn" for="sRestore">⬆️ ' + esc(T('restore')) + '</label><input type="file" id="sRestore" accept="application/json,.json" class="hide"></div><p class="muted">' + esc(T('dataNote')) + '</p>' +
+    '<div class="row"><button class="btn ghosty" id="sTour">🧭 ' + esc(T('tourAgain')) + '</button><button class="btn ghosty" id="sReset" style="color:var(--bad);border-color:var(--bad)">🗑️ ' + esc(T('deleteAll')) + '</button></div></div>' +
+    '<div class="badge">RummyNest v' + APP_VERSION + ' · © AppNest 2026</div>';
+  $('#sName').onchange = e => { ST.name = e.target.value.trim().slice(0, 20); saveST(); };
+  $('#sLang').onchange = e => { ST.lang = e.target.value; saveST(); applyLang(); renderSettings(); renderHome(); };
+  $$('#setBody [data-theme-pick]').forEach(x => x.onclick = () => { ST.theme = x.dataset.themePick; saveST(); applyLook(); renderSettings(); });
+  $$('#setBody [data-seg]').forEach(sg => sg.onclick = e => { const v = e.target.closest('[data-v]'); if (!v) return; const k = sg.dataset.seg; ST[k] = isNaN(+v.dataset.v) ? v.dataset.v : +v.dataset.v; saveST(); applyLook(); renderSettings(); });
+  $$('#setBody .sw').forEach(x => { const f = () => { ST[x.dataset.k] = !ST[x.dataset.k]; saveST(); applyLook(); renderSettings(); }; x.onclick = f; x.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); f(); } }; });
+  $('#sBackup').onclick = backup;
+  $('#sRestore').onchange = e => { if (e.target.files[0]) restore(e.target.files[0]); };
+  $('#sTour').onclick = () => tour(true);
+  $('#sReset').onclick = () => confirmBox(T('deleteAllQ'), T('deleteAll'), () => confirmBox(T('deleteAllQ2'), T('deleteAll'), () => { try { LINK && LINK.close(); } catch (e) {} LS.keys().forEach(k => LS.del(k)); location.href = location.pathname; }));
+}
+
+/* ---------- stats ---------- */
+function renderStats() {
+  const S = LS.get('stats', {}), rows = [['cpu0', T('vsCpu') + ' · ' + T('lvEasy')], ['cpu1', T('vsCpu') + ' · ' + T('lvMed')], ['cpu2', T('vsCpu') + ' · ' + T('lvHard')], ['cpu3', T('vsCpu') + ' · ' + T('lvExpert')], ['online', T('online')], ['two', T('twoPhone')]];
+  let h = '';
+  for (const [k, lab] of rows) {
+    const b = S[k]; if (!b || !b.hp) continue;
+    const pct = (a, n) => n ? Math.round(a / n * 100) + '%' : '–';
+    h += '<div class="card"><h3>' + esc(lab) + '</h3><table class="tbl">' +
+      (k === 'two' ? '<tr><td>' + esc(T('matchesPlayed')) + '</td><td>' + b.mp + '</td></tr><tr><td>' + esc(T('handsPlayed')) + '</td><td>' + b.hp + '</td></tr>' :
+        '<tr><td>' + esc(T('matches')) + '</td><td>' + iso(b.mw + ' / ' + b.mp) + '</td><td>' + pct(b.mw, b.mp) + '</td></tr>' +
+        '<tr><td>' + esc(T('handsWon')) + '</td><td>' + iso(b.hw + ' / ' + b.hp) + '</td><td>' + pct(b.hw, b.hp) + '</td></tr>' +
+        '<tr><td>' + esc(T('gins')) + '</td><td>' + b.gin + '</td><td></td></tr><tr><td>' + esc(T('knocks')) + '</td><td>' + b.knock + '</td><td></td></tr>' +
+        '<tr><td>' + esc(T('undercutsFor')) + '</td><td>' + b.uFor + '</td><td></td></tr><tr><td>' + esc(T('undercutsAg')) + '</td><td>' + b.uAg + '</td><td></td></tr>' +
+        (b.best ? '<tr><td>' + esc(T('bestWin')) + '</td><td>+' + b.best + '</td><td></td></tr>' : '')) + '</table></div>';
+  }
+  $('#statBody').innerHTML = h || '<div class="card"><p>' + esc(T('noStats')) + '</p><button class="btn main" id="stPlay" style="width:100%">' + esc(T('vsCpu')) + '</button></div>';
+  if ($('#stPlay')) $('#stPlay').onclick = chooseLevel;
+}
+
+/* ---------- replays (seed + moves → the engine rebuilds every step) ---------- */
+function renderReplays() {
+  const R = LS.get('replays', []);
+  if (!R.length) { $('#repBody').innerHTML = '<div class="card"><p>' + esc(T('noReplays')) + '</p></div>'; return; }
+  $('#repBody').innerHTML = R.map((r, i) => '<button class="card" data-i="' + i + '" style="width:100%;text-align:start;cursor:pointer;display:block"><b>' + esc(r.names.join(' – ')) + '</b><div class="muted">' + esc(new Date(r.d).toLocaleString(ST.lang)) + ' · ' + esc(r.type === 'draw' ? T('rDraw') : T('winsX', r.names[r.winner]) + ' +' + r.pts) + '</div></button>').join('');
+  $$('#repBody [data-i]').forEach(b => b.onclick = () => playReplay(R[+b.dataset.i]));
+}
+function playReplay(r) {
+  const M = GIN.newMatch({ seed: r.seed, dealer: r.dealer, bigGin: r.bigGin, names: r.names, target: 9999 });
+  const frames = [JSON.parse(JSON.stringify(M.H))];
+  for (const [s, a, c] of r.log) {
+    const act = { a }; if (a === 'discard' || a === 'knock') act.c = c;
+    if (!GIN.apply(M, s, act)) break; frames.push(JSON.parse(JSON.stringify(M.H)));
+  }
+  let i = 0, auto = null;
+  const o = overlay('<h3>' + esc(T('replay')) + '</h3><div class="rp" id="rpBody"></div><div class="row" dir="ltr" style="margin-top:10px"><button class="btn" data-k="0">⏮</button><button class="btn" data-k="-1">◀</button><button class="btn main" data-k="p">▶</button><button class="btn" data-k="1">▶|</button><button class="btn" data-k="9">⏭</button></div><div class="row" style="margin-top:8px"><button class="btn ghosty" data-k="x">' + esc(T('close')) + '</button></div>', 'center');
+  const sortH = h => h.slice().sort((a, b) => RC.suit(a) - RC.suit(b) || RC.rank(a) - RC.rank(b));
+  function draw() {
+    const H = frames[i], e = i ? r.log[i - 1] : null;
+    let t = i ? r.names[e[0]] + ': ' + (e[1] === 'take' ? T('tookX', cardTxt(e[2])) : e[1] === 'draw' ? T('drewStock') : e[1] === 'pass' ? T('passed') : e[1] === 'knock' ? T('knocked') + ' · ' + T('threwX', cardTxt(e[2])) : T('threwX', cardTxt(e[2]))) : T('dealt');
+    if (i === frames.length - 1 && H.res) t += ' — ' + resultTitle(H.res) + (H.res.type !== 'draw' ? ' · ' + r.names[H.res.winner] + ' +' + H.res.pts : '');
+    $('#rpBody').innerHTML = [0, 1].map(s => '<div><b>' + esc(r.names[s]) + '</b> <span class="muted">' + esc(T('deadwood')) + ' ' + RC.best(H.hands[s]).dw + '</span><div class="hrow">' + sortH(H.hands[s]).map(c => cardHTML(c)).join('') + '</div></div>').join('') +
+      '<div class="hrow" style="align-items:center;gap:10px"><span class="muted">' + esc(T('discardPile')) + '</span>' + (H.discard.length ? cardHTML(H.discard[H.discard.length - 1], '', 'style="--w:40px"') : '') + '<span class="muted">' + esc(T('stock')) + ' ' + H.stock.length + '</span></div>' +
+      '<p style="text-align:center;min-height:44px">' + esc(t) + '</p><p class="muted" style="text-align:center">' + iso((i) + ' / ' + (frames.length - 1)) + '</p>';
+  }
+  o.addEventListener('click', e => {
+    const k = e.target.closest('[data-k]'); if (!k) return; const v = k.dataset.k;
+    if (v === 'x') { clearInterval(auto); closeOv(o); return; }
+    if (v === 'p') { if (auto) { clearInterval(auto); auto = null; k.textContent = '▶'; } else { k.textContent = '⏸'; auto = setInterval(() => { if (i < frames.length - 1) { i++; draw(); } else { clearInterval(auto); auto = null; k.textContent = '▶'; } }, 900); } return; }
+    i = v === '0' ? 0 : v === '9' ? frames.length - 1 : Math.max(0, Math.min(frames.length - 1, i + +v)); draw();
+  });
+  draw();
+}
+
+/* ---------- rules ---------- */
+function renderRules() {
+  $('#rulesBody').innerHTML = T('rulesHtml').replace(/\{knock\}/g, GIN.KNOCK);
+}
+
+/* ---------- about ---------- */
+function renderAbout() {
+  $('#aboutBody').innerHTML = '<div style="text-align:center"><img src="icon-192.png" alt="" width="84" height="84" style="border-radius:20px"><h2 style="font-family:var(--disp);font-weight:400;margin:8px 0 0">RummyNest</h2><div class="muted">' + esc(T('tagline')) + '</div></div>' +
+    '<div class="card" style="margin-top:14px"><table class="tbl" style="text-align:start"><tr><td>' + esc(T('version')) + '</td><td>' + APP_VERSION + '</td></tr><tr><td>' + esc(T('developer')) + '</td><td>Barak Aflalo</td></tr><tr><td>' + esc(T('platform')) + '</td><td>PWA · HTML5</td></tr><tr><td>' + esc(T('storage')) + '</td><td>' + esc(T('storageVal')) + '</td></tr><tr><td>' + esc(T('license')) + '</td><td>© AppNest 2026</td></tr></table></div>' +
+    '<div class="row"><a class="btn" href="https://appnest-store.pages.dev" target="_blank" rel="noopener">🏪 ' + esc(T('store')) + '</a><button class="btn" id="aShare">📤 ' + esc(T('shareApp')) + '</button></div>' +
+    '<div class="row" style="margin-top:10px"><a class="btn" href="mailto:appnest55@gmail.com?subject=RummyNest%20' + APP_VERSION + '">✉️ ' + esc(T('feedback')) + '</a><button class="btn" id="aTour">🧭 ' + esc(T('tourAgain')) + '</button></div>' +
+    '<div class="row" style="margin-top:10px"><a class="btn" href="privacy_policy.html" target="_blank">🔒 ' + esc(T('privacy')) + '</a><button class="btn" id="aRules">📖 ' + esc(T('rules')) + '</button></div>' +
+    '<div class="card" style="margin-top:14px"><h3>' + esc(T('disclaimerT')) + '</h3><p class="muted">' + esc(T('disclaimer')) + '</p></div>' +
+    '<div class="card"><h3>' + esc(T('diag')) + '</h3><p class="muted" style="direction:ltr;text-align:left;font-size:12px;word-break:break-all">' + esc('v' + APP_VERSION + ' · ' + navigator.userAgent.slice(0, 120) + ' · SW:' + ('serviceWorker' in navigator) + ' · WebRTC:' + (!!window.RTCPeerConnection) + ' · mic:' + !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) + '</p>' + (ERRS.length ? '<p class="muted" style="direction:ltr;text-align:left;font-size:12px">' + ERRS.map(e => esc(e.t.slice(5, 16) + ' ' + e.m)).join('<br>') + '</p>' : '<p class="muted">' + esc(T('noErrors')) + '</p>') + '</div>';
+  $('#aShare').onclick = async () => { const d = { title: 'RummyNest', text: T('shareText') + (ST.name ? ' — ' + ST.name : ''), url: location.origin + location.pathname }; try { if (navigator.share) await navigator.share(d); else { await navigator.clipboard.writeText(d.url); toast(T('copied')); } } catch (e) {} };
+  $('#aTour').onclick = () => tour(true);
+  $('#aRules').onclick = () => { renderRules(); RULES_BACK = 'about'; show('rules'); };
+}
+
+/* ---------- first-run tour ---------- */
+function tour(force) {
+  if (!force && ST.tutDone) return;
+  const steps = [['🃏', 'tour1t', 'tour1'], ['✋', 'tour2t', 'tour2'], ['🧮', 'tour3t', 'tour3'], ['👊', 'tour4t', 'tour4'], ['🀄', 'tour5t', 'tour5'], ['🌍', 'tour6t', 'tour6']];
+  let i = 0;
+  const o = overlay('<div class="tut" id="tutB"></div>', 'center'); o.dataset.lock = '1';
+  function draw() {
+    const [ic, t, b] = steps[i];
+    $('#tutB').innerHTML = '<div class="big">' + ic + '</div><h3>' + esc(T(t)) + '</h3><p>' + esc(T(b)) + '</p><div class="dots">' + steps.map((_, j) => '<i class="' + (j === i ? 'on' : '') + '"></i>').join('') + '</div><div class="row"><button class="btn ghosty" data-k="skip">' + esc(T('skip')) + '</button><button class="btn main" data-k="next">' + esc(i === steps.length - 1 ? T('letsPlay') : T('next')) + '</button></div>';
+  }
+  o.addEventListener('click', e => { const k = e.target.closest('[data-k]'); if (!k) return; if (k.dataset.k === 'next' && i < steps.length - 1) { i++; draw(); return; } ST.tutDone = true; saveST(); closeOv(o); });
+  draw();
+}
+
+/* ---------- init ---------- */
+function init() {
+  applyLook(); applyLang(); initLink(); bindGame(); bindVoice(); subWatch();
+  $$('[data-home]').forEach(b => b.onclick = () => { if (b.closest('#rules') && RULES_BACK !== 'home') { const t = RULES_BACK; RULES_BACK = 'home'; show(t); return; } if (b.closest('#lobby') && G && G.mode === 'online' && !G.M && !G.v) { netLeave(); return; } show('home'); renderHome(); });
+  $('#hTheme').onclick = () => { ST.theme = THEMES[(THEMES.indexOf(ST.theme) + 1) % THEMES.length]; saveST(); applyLook(); toast('🎨 ' + T('theme')); };
+  $('#hMode').onclick = () => { ST.mode = ST.mode === 'day' ? 'night' : 'day'; saveST(); applyLook(); };
+  $('#hLang').onclick = () => { const ks = Object.keys(LANGS); ST.lang = ks[(ks.indexOf(ST.lang) + 1) % ks.length]; saveST(); renderHome(); toast(LANGS[ST.lang]); };
+  $('#hAbout').onclick = () => { renderAbout(); show('about'); };
+  $('#hRules').onclick = () => { renderRules(); RULES_BACK = 'home'; show('rules'); };
+  $('#hStats').onclick = () => { renderStats(); show('stats'); };
+  $('#hReplays').onclick = () => { renderReplays(); show('replays'); };
+  $('#hSettings').onclick = () => { renderSettings(); show('settings'); };
+  $('#vgrid').onclick = e => { const b = e.target.closest('[data-v]'); if (b) { ST.variant = b.dataset.v; saveST(); renderHome(); } };
+  $('#mCpu').onclick = chooseLevel;
+  $('#mTwo').onclick = askTwo;
+  $('#mOnline').onclick = () => { if (G && G.mode === 'online') { show(G.M || G.v ? 'game' : 'lobby'); if (!G.M && !G.v) renderLobby(); } else openOnline(); };
+  $('#mCont').onclick = () => {
+    if (!G) return;
+    if (G.mode === 'online') { show(G.M || G.v ? 'game' : 'lobby'); if (!G.M && !G.v) renderLobby(); return; }
+    if (G.mode === 'two') PASS_ON = true;
+    show('game'); afterChange();
+  };
+  // an old saved game from an incompatible build is dropped gently (vs-computer games are kept)
+  if (G && G.M && G.M.v !== 1) { G = null; saveGame(); }
+  if (G && G.mode === 'online' && G.net && G.net.sess) { LINK.resume(G.net.sess); if (isGuest() && G.v) setTimeout(() => LINK.isOpen() && LINK.sendTo(0, { type: 'hello' }), 1500); }
+  else if (G && G.mode === 'online') { G = null; saveGame(); }
+  const q = new URLSearchParams(location.search), jc = q.get('join');
+  renderHome();
+  if (jc) {
+    const q2 = new URLSearchParams(location.search); q2.delete('join'); history.replaceState(null, '', location.pathname + (q2.toString() ? '?' + q2 : ''));
+    if (G && G.mode === 'online' && LINK.session && LINK.session.code === jc.toUpperCase()) show(G.v ? 'game' : 'lobby');
+    else if (G && G.mode === 'online') { toast(T('alreadyInRoom')); show('lobby'); renderLobby(); }
+    else { if (!ST.name) { show('lobby'); renderLobby(); $('#lCode').value = jc.toUpperCase(); toast(T('enterNameJoin'), 4000); } else openOnline(jc); }
+  } else if (G && G.mode === 'online') { show(G.M || G.v ? 'game' : 'lobby'); if (!(G.M || G.v)) renderLobby(); }
+  else tour(false);
+  // file:// warning (service worker, paths and offline break when opened from a ZIP)
+  if (location.protocol === 'file:') toast(T('fileWarn'), 6000);
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !q.get('nosw')) navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+document.addEventListener('DOMContentLoaded', init);
+
+</script>
+</body>
+</html>
