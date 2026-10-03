@@ -241,7 +241,30 @@ input.in,select.in{width:100%;min-height:48px;border-radius:12px;border:1.5px so
 .rp{display:flex;flex-direction:column;gap:8px}
 .rp .hrow{display:flex;direction:ltr;flex-wrap:wrap;gap:2px;justify-content:center}
 .rp .hrow .pc{--w:30px}
+.hopps{display:flex;gap:6px;padding:8px 8px 2px;overflow-x:auto}
+.hopp{flex:1;min-width:0;padding:6px 8px;border-radius:12px;background:rgba(0,0,0,.25);border:1.5px solid transparent;font-size:13px;line-height:1.25}
+.hopp b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+.hopp small{display:block;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hopp .dot{float:inline-end;width:9px;height:9px;border-radius:50%;background:#888;margin-top:4px}
+.hopp .dot.on{background:#46d07a}.hopp .dot.sub{background:#e0b040}
+.hopp.turn{border-color:var(--acc2)}
+.htable{width:100%;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-content:flex-start;max-height:38vh;overflow-y:auto;padding:2px}
+.hmeld{position:relative;display:flex;direction:ltr;gap:1px;padding:4px 4px 4px 14px;border-radius:10px;border:1.5px solid var(--feltLine);background:rgba(0,0,0,.18);cursor:pointer;min-height:44px;align-items:center}
+.hmeld .own{position:absolute;left:3px;top:5px;bottom:5px;width:5px;border-radius:3px}
+.hmeld.fit{border-color:var(--acc2);box-shadow:0 0 0 2px var(--acc2);animation:pulse 1.6s ease-in-out infinite}
+.hempty{padding:10px;color:var(--feltInk);opacity:.6}
+.hstage{padding:6px 8px;margin:0 6px 6px;border-radius:12px;background:rgba(0,0,0,.3)}
+.hstage .stg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.hstage .btn{min-height:40px;padding:4px 10px;color:var(--feltInk);border-color:var(--feltInk)}
+.hstage .btn.main{background:var(--acc);border-color:var(--acc);color:var(--accInk)}
+.pc.jk{color:#8a2be2}
+.pc.jk .jkf{position:absolute;inset:0;display:grid;place-items:center;font-size:calc(var(--w)*.6)}
+[data-skin="tiles"] .pc.jk .jkf{display:none}
+[data-skin="tiles"] .pc.jk{color:#c4262e}
+.hand .pc.must{box-shadow:0 0 0 3px #e0584f}
 @media (orientation:landscape) and (max-height:520px){
+  .hopps{grid-column:1;grid-row:2}
+  .htable{max-height:none}
   #game.on{display:grid;grid-template-columns:1fr minmax(240px,32%);grid-template-rows:auto auto auto auto 1fr auto auto}
   .gtop{grid-column:1/3;grid-row:1}
   .opp{grid-column:1;grid-row:2;padding-top:4px}
@@ -300,9 +323,11 @@ input.in,select.in{width:100%;min-height:48px;border-radius:12px;border:1.5px so
     <button class="ibtn" id="gMenu" aria-label="menu">⋯</button>
   </div>
   <div class="opp" id="opp"><span class="dot" id="oDot"></span><div class="who"><b id="oName"></b><small id="oStat"></small></div><span class="chip hide" id="oKnownLbl"></span></div>
+  <div class="hopps hide" id="hOpps"></div>
   <div class="ohand" id="oHand"></div>
   <div class="known" id="oKnown"></div>
   <div class="table">
+    <div class="htable hide" id="hTable"></div>
     <div class="piles">
       <div class="pile" id="pStock" role="button" tabindex="0"><div class="stack" id="stockStack"></div><span class="lab" id="stockLbl"></span></div>
       <div class="pile" id="pDisc" role="button" tabindex="0"><div class="dpile" id="discStack"></div><span class="lab" id="discLbl"></span></div>
@@ -311,6 +336,7 @@ input.in,select.in{width:100%;min-height:48px;border-radius:12px;border:1.5px so
   </div>
   <div class="mine">
     <div class="dwline"><span><span data-t="deadwood"></span>: <b id="myDw">0</b></span><span class="chip hide" id="canKnock"></span><span class="chip" id="mySort"></span></div>
+    <div class="hstage hide" id="hStage"></div>
     <div class="hand" id="hand"></div>
   </div>
   <div class="gbar" id="gbar">
@@ -965,6 +991,403 @@ const GIN = (() => {
 
 
 
+/* ---- engine_hor.js ---- */
+/* =====================================================================
+   RummyNest — רמי הורדות (contract-style rummy with an opening threshold)
+   2–4 players · two decks + jokers · 14 cards · draw → (open / meld / lay off / swap joker) → discard
+   ids: 0..103 = two decks (base = id % 52, suit = base/13, rank = base%13+1); 104.. = jokers
+   Positions in a run: 1..13, and 14 = ace above the king (house rule "aceHigh", on by default)
+   ===================================================================== */
+const HOR = (() => {
+  const RCx = (typeof RC !== 'undefined') ? RC : require('./engine.js').RC;
+  const isJ = c => c >= 104, rk = c => (c % 52) % 13 + 1, su = c => Math.floor((c % 52) / 13), base = c => c % 52;
+  const pen = c => isJ(c) ? 30 : Math.min(10, rk(c));                      // left in hand at the end
+  const posVal = p => p === 1 ? 1 : p === 14 ? 11 : Math.min(10, p);        // value of a run position (opening)
+  const setVal = r => r === 1 ? 11 : Math.min(10, r);
+  const DEF = { threshold: 30, jokers: 2, aceHigh: true, target: 300, hand: 14 };
+
+  /* ---------- a meld on its own: is it legal, what does each joker stand for, what is it worth ---------- */
+  function validMeld(cards, aceHigh) {
+    if (!cards || cards.length < 3) return null;
+    const nat = cards.filter(c => !isJ(c)), jk = cards.filter(isJ);
+    if (nat.length < 2) return null;
+    // set: one rank, different suits, up to 4
+    if (nat.every(c => rk(c) === rk(nat[0]))) {
+      const suits = nat.map(su);
+      if (new Set(suits).size === suits.length && cards.length <= 4) {
+        const miss = [0, 1, 2, 3].filter(s => !suits.includes(s)), r = rk(nat[0]);
+        const jr = {}; jk.forEach((j, i) => jr[j] = { r, s: miss[i] });
+        return { type: 'set', rank: r, cards: nat.concat(jk), jr, value: setVal(r) * cards.length };
+      }
+    }
+    // run: one suit, consecutive positions, jokers fill gaps then extend (up first, then down)
+    if (!nat.every(c => su(c) === su(nat[0]))) return null;
+    const s = su(nat[0]), opts = [nat.map(rk)];
+    if (aceHigh && nat.some(c => rk(c) === 1)) opts.push(nat.map(c => rk(c) === 1 ? 14 : rk(c)));
+    for (const pos of opts) {
+      if (new Set(pos).size !== pos.length) continue;
+      if (pos.includes(1) && pos.includes(14)) continue;
+      const lo0 = Math.min(...pos), hi0 = Math.max(...pos), gaps = hi0 - lo0 + 1 - pos.length;
+      if (gaps > jk.length) continue;
+      let extra = jk.length - gaps, lo = lo0, hi = hi0;
+      const top = lo0 === 1 ? 13 : (aceHigh ? 14 : 13), bot = hi0 === 14 ? 2 : 1;
+      while (extra > 0 && hi < top) { hi++; extra--; }
+      while (extra > 0 && lo > bot) { lo--; extra--; }
+      if (extra > 0 || hi - lo + 1 > 13) continue;
+      const order = [], jr = {}, jq = jk.slice(), byPos = {};
+      nat.forEach((c, i) => byPos[pos[i]] = c);
+      let value = 0;
+      for (let p = lo; p <= hi; p++) { if (byPos[p] != null) order.push(byPos[p]); else { const j = jq.shift(); jr[j] = { r: p === 14 ? 1 : p, s, p }; order.push(j); } value += posVal(p); }
+      return { type: 'run', suit: s, lo, hi, cards: order, jr, value };
+    }
+    return null;
+  }
+  /* ---------- adding one card to a meld that is already on the table ---------- */
+  function fitLay(m, c, aceHigh) {
+    if (m.type === 'set') {
+      if (m.cards.length >= 4) return null;
+      if (isJ(c)) return { at: 'end' };
+      const natS = m.cards.filter(x => !isJ(x)).map(su);
+      return rk(c) === m.rank && !natS.includes(su(c)) ? { at: 'end' } : null;
+    }
+    const top = m.lo === 1 ? 13 : (aceHigh ? 14 : 13), bot = m.hi === 14 ? 2 : 1;
+    if (m.hi - m.lo + 1 >= 13) return null;
+    if (isJ(c)) return m.hi < top ? { at: 'hi' } : m.lo > bot ? { at: 'lo' } : null;
+    if (su(c) !== m.suit) return null;
+    const r = rk(c);
+    if (r === m.hi + 1 && m.hi + 1 <= top && !(r === 1)) return { at: 'hi' };
+    if (r === 1 && m.hi === 13 && aceHigh && m.lo > 1) return { at: 'hi' };
+    if (r === m.lo - 1 && m.lo - 1 >= bot) return { at: 'lo' };
+    return null;
+  }
+  function doLay(m, c, at) {
+    if (m.type === 'set') {
+      m.cards.push(c);
+      const natS = m.cards.filter(x => !isJ(x)).map(su), miss = [0, 1, 2, 3].filter(s => !natS.includes(s)); let i = 0;
+      m.cards.filter(isJ).forEach(j => m.jr[j] = { r: m.rank, s: miss[i++] });
+      return;
+    }
+    if (at === 'hi') { m.hi++; m.cards.push(c); if (isJ(c)) m.jr[c] = { r: m.hi === 14 ? 1 : m.hi, s: m.suit, p: m.hi }; }
+    else { m.lo--; m.cards.unshift(c); if (isJ(c)) m.jr[c] = { r: m.lo, s: m.suit, p: m.lo }; }
+  }
+  /* which joker in this meld could the natural card c replace? */
+  function swapFit(m, c) {
+    if (isJ(c)) return null;
+    for (const j of m.cards.filter(isJ)) {
+      const rep = m.jr[j];
+      if (m.type === 'run' && rep.s === su(c) && rep.r === rk(c)) return j;
+      if (m.type === 'set' && rk(c) === m.rank && !m.cards.filter(x => !isJ(x)).map(su).includes(su(c))) return j;
+    }
+    return null;
+  }
+
+  /* ---------- best way to split a hand into melds (memoised; copies of a card are interchangeable) ---------- */
+  function plan(hand, aceHigh, mode) {          // mode 'dw' → least penalty left · 'open' → most meld value
+    const memo = new Map();
+    const keyOf = arr => arr.map(c => isJ(c) ? 104 : base(c)).sort((a, b) => a - b).join(',');
+    function meldsWith(x, rest) {               // melds that use card x (+ cards from rest)
+      const out = [], J = rest.filter(isJ);
+      const r = rk(x), s = su(x);
+      // sets
+      const bySuit = {}; for (const c of rest) if (!isJ(c) && rk(c) === r && su(c) !== s && bySuit[su(c)] == null) bySuit[su(c)] = c;
+      const others = Object.values(bySuit);
+      for (let m = 0; m < (1 << others.length); m++) {
+        const pick = others.filter((_, i) => m & (1 << i)), nat = 1 + pick.length;
+        for (let k = 0; k <= Math.min(2, J.length); k++) { const n = nat + k; if (n >= 3 && n <= 4 && nat >= 2) out.push([x, ...pick, ...J.slice(0, k)]); }
+      }
+      // runs through x
+      const have = {}; for (const c of rest) if (!isJ(c) && su(c) === s && have[rk(c)] == null) have[rk(c)] = c;
+      const posX = [r]; if (r === 1 && aceHigh) posX.push(14);
+      for (const p of posX) {
+        const top = aceHigh ? 14 : 13;
+        for (let lo = Math.max(1, p - 12); lo <= p; lo++) for (let hi = Math.max(p, lo + 2); hi <= Math.min(top, lo + 12); hi++) {
+          if (lo === 1 && hi === 14) continue;
+          const cards = [x]; let miss = 0, nat = 1;
+          for (let q = lo; q <= hi; q++) { if (q === p) continue; const rr = q === 14 ? 1 : q; if (rr === r && (q === 1 || q === 14)) { miss++; continue; } if (have[rr] != null) { cards.push(have[rr]); nat++; } else miss++; }
+          if (miss > J.length || nat < 2) continue;
+          // jokers only where needed: skip windows whose ends are jokers unless the run would be shorter than 3 without them
+          const endNat = q => { const rr = q === 14 ? 1 : q; return q === p || have[rr] != null; };
+          if ((!endNat(lo) || !endNat(hi)) && nat >= 3) continue;
+          out.push(cards.concat(J.slice(0, miss)));
+        }
+      }
+      return out;
+    }
+    function go(cards) {
+      const nat = cards.filter(c => !isJ(c));
+      if (!nat.length) { const js = cards.length; return mode === 'dw' ? { v: js * 30, melds: [], loose: cards.slice() } : { v: 0, melds: [], loose: cards.slice() }; }
+      const key = keyOf(cards); if (memo.has(key)) { const m = memo.get(key); return remap(m, cards); }
+      nat.sort((a, b) => base(a) - base(b));
+      const x = nat[0], rest = cards.filter(c => c !== x);
+      const a = go(rest); let best = { v: mode === 'dw' ? a.v + pen(x) : a.v, melds: a.melds, loose: a.loose.concat([x]) };
+      for (const m of meldsWith(x, rest)) {
+        const vm = validMeld(m, aceHigh); if (!vm) continue;
+        const left = cards.filter(c => !m.includes(c)), b = go(left);
+        const v = mode === 'dw' ? b.v : b.v + vm.value;
+        if (mode === 'dw' ? v < best.v : v > best.v) best = { v, melds: b.melds.concat([vm.cards]), loose: b.loose };
+      }
+      memo.set(key, best); return best;
+    }
+    /* memo hits come from a different copy of the same cards — map the stored ids onto these ones */
+    function remap(m, cards) {
+      const pool = cards.slice(), take = c => { const i = pool.findIndex(q => (isJ(c) ? isJ(q) : !isJ(q) && base(q) === base(c))); return pool.splice(i, 1)[0]; };
+      const melds = m.melds.map(md => md.map(take)); return { v: m.v, melds, loose: m.loose.map(take) };
+    }
+    return go(hand.slice());
+  }
+
+  /* ---------- match / round ---------- */
+  function newMatch(o) {
+    o = Object.assign({}, DEF, o || {});
+    const n = Math.max(2, Math.min(4, o.players || 2));
+    const M = { g: 'hor', v: 1, n, names: (o.names || []).slice(0, n), threshold: o.threshold, jokers: o.jokers, aceHigh: o.aceHigh, target: o.target, handSize: o.hand,
+      scores: Array(n).fill(0), wins: Array(n).fill(0), roundNo: 0, dealer: o.dealer != null ? o.dealer : 0, seed: o.seed != null ? o.seed : RCx.newSeed(), hist: [], over: false, winner: null, R: null };
+    while (M.names.length < n) M.names.push('');
+    deal(M); return M;
+  }
+  function deal(M) {
+    const seed = (M.seed + M.roundNo * 7919) >>> 0, rr = RCx.rng(seed);
+    const deck = RCx.shuffle(Array.from({ length: 104 + M.jokers }, (_, i) => i), rr);
+    const R = { seed, dealer: M.dealer, hands: Array.from({ length: M.n }, () => []), stock: deck, discard: [], table: [], opened: Array(M.n).fill(false),
+      turn: (M.dealer + 1) % M.n, phase: 'draw', took: null, must: [], log: [], res: null, turns: 0, reshuffled: 0, picked: Array.from({ length: M.n }, () => []) };
+    for (let i = 0; i < M.handSize; i++) for (let s = 0; s < M.n; s++) R.hands[(M.dealer + 1 + s) % M.n].push(deck.pop());
+    R.discard.push(deck.pop()); R.up = R.discard[0];
+    M.R = R; M.roundNo++; return R;
+  }
+  const top = R => R.discard[R.discard.length - 1];
+  const has = (hand, cs) => { const h = hand.slice(); for (const c of cs) { const i = h.indexOf(c); if (i < 0) return false; h.splice(i, 1); } return true; };
+  const del = (hand, cs) => { for (const c of cs) hand.splice(hand.indexOf(c), 1); };
+
+  function legal(M, s, a) {
+    const R = M.R; if (!R || M.over || R.phase === 'end' || R.turn !== s || !a) return false;
+    const hand = R.hands[s];
+    switch (a.a) {
+      case 'draw': return R.phase === 'draw';
+      case 'take': return R.phase === 'draw' && R.discard.length > 0;
+      case 'open': {
+        if (R.phase !== 'play' || R.opened[s] || !Array.isArray(a.melds) || !a.melds.length) return false;
+        const all = [].concat(...a.melds); if (!has(hand, all) || hand.length - all.length < 1) return false;
+        let v = 0; for (const m of a.melds) { const vm = validMeld(m, M.aceHigh); if (!vm) return false; v += vm.value; }
+        return v >= M.threshold;
+      }
+      case 'meld': return R.phase === 'play' && R.opened[s] && has(hand, a.cards || []) && hand.length - a.cards.length >= 1 && !!validMeld(a.cards, M.aceHigh);
+      case 'lay': return R.phase === 'play' && R.opened[s] && hand.includes(a.c) && hand.length >= 2 && R.table[a.m] && !!fitLay(R.table[a.m], a.c, M.aceHigh);
+      case 'swap': {
+        if (R.phase !== 'play' || !R.opened[s] || !hand.includes(a.c) || !R.table[a.m]) return false;
+        const j = swapFit(R.table[a.m], a.c); return j != null;
+      }
+      case 'discard': {
+        if (R.phase !== 'play' || !hand.includes(a.c)) return false;
+        if (a.c === R.took && R.tookFrom === 'd' && hand.length > 1) return false;                    // no throwing back the card just taken
+        // a joker taken off the table must be used this turn (if the table can still take it)
+        if (R.must.some(j => hand.includes(j) && R.table.some(m => fitLay(m, j, M.aceHigh)))) return false;
+        return true;
+      }
+    }
+    return false;
+  }
+  function apply(M, s, a) {
+    if (!legal(M, s, a)) return false;
+    const R = M.R, hand = R.hands[s];
+    if (a.a === 'draw') {
+      if (!R.stock.length) {
+        if (R.reshuffled >= 1 || R.discard.length < 2) { R.log.push([s, 'draw', null]); endRound(M, null); return true; }
+        const t = R.discard.pop(); R.stock = RCx.shuffle(R.discard, RCx.rng(R.seed + 17)); R.discard = [t]; R.reshuffled++;
+      }
+      const c = R.stock.pop(); hand.push(c); R.took = c; R.tookFrom = 's'; R.phase = 'play'; R.log.push([s, 'draw', null]);
+    } else if (a.a === 'take') {
+      const c = R.discard.pop(); hand.push(c); R.took = c; R.tookFrom = 'd'; R.phase = 'play'; R.picked[s].push(c); R.log.push([s, 'take', c]);
+    } else if (a.a === 'open') {
+      for (const m of a.melds) { const vm = validMeld(m, M.aceHigh); del(hand, m); R.table.push(Object.assign(vm, { owner: s })); }
+      R.opened[s] = true; R.log.push([s, 'open', a.melds.map(m => m.slice())]);
+    } else if (a.a === 'meld') {
+      const vm = validMeld(a.cards, M.aceHigh); del(hand, a.cards); R.table.push(Object.assign(vm, { owner: s })); R.must = R.must.filter(j => !a.cards.includes(j)); R.log.push([s, 'meld', a.cards.slice()]);
+    } else if (a.a === 'lay') {
+      const m = R.table[a.m], f = fitLay(m, a.c, M.aceHigh); del(hand, [a.c]); doLay(m, a.c, f.at); R.must = R.must.filter(j => j !== a.c); R.log.push([s, 'lay', a.c, a.m]);
+    } else if (a.a === 'swap') {
+      const m = R.table[a.m], j = swapFit(m, a.c), i = m.cards.indexOf(j);
+      m.cards[i] = a.c; delete m.jr[j]; del(hand, [a.c]); hand.push(j); R.must.push(j);
+      if (m.type === 'set') { const natS = m.cards.filter(x => !isJ(x)).map(su), miss = [0, 1, 2, 3].filter(q => !natS.includes(q)); let k = 0; m.cards.filter(isJ).forEach(x => m.jr[x] = { r: m.rank, s: miss[k++] }); }
+      R.log.push([s, 'swap', a.c, a.m, j]);
+    } else if (a.a === 'discard') {
+      del(hand, [a.c]); R.discard.push(a.c); R.log.push([s, 'discard', a.c]); R.turns++; R.took = null; R.must = [];
+      if (!hand.length) endRound(M, s);
+      else { R.turn = (s + 1) % M.n; R.phase = 'draw'; }
+    }
+    // the meld that was just changed: keep the moved card visible to the UI
+    return true;
+  }
+  function endRound(M, w) {
+    const R = M.R; R.phase = 'end';
+    const left = R.hands.map(h => h.reduce((t, c) => t + pen(c), 0));
+    const res = { winner: w, left, pts: 0, opened: R.opened.slice() };
+    if (w != null) { res.pts = left.reduce((t, v, i) => t + (i === w ? 0 : v), 0); M.scores[w] += res.pts; M.wins[w]++; M.dealer = (M.dealer + 1) % M.n; }
+    R.res = res;
+    M.hist.push({ n: M.roundNo, winner: w, pts: res.pts, left: left.slice(), seed: R.seed, dealer: R.dealer, log: R.log.slice() });
+    const best = Math.max(...M.scores);
+    if (best >= M.target) { M.over = true; M.winner = M.scores.indexOf(best); }
+  }
+  function nextRound(M) { if (M.over || !M.R || M.R.phase !== 'end') return false; deal(M); return true; }
+
+  function view(M, s) {
+    const R = M.R, end = R.phase === 'end';
+    return {
+      g: 'hor', seat: s, n: M.n, names: M.names, scores: M.scores, wins: M.wins, target: M.target, threshold: M.threshold, aceHigh: M.aceHigh, jokers: M.jokers,
+      roundNo: M.roundNo, dealer: R.dealer, turn: R.turn, phase: R.phase, took: R.turn === s ? R.took : null, tookFrom: R.turn === s ? R.tookFrom : null, must: R.turn === s ? R.must.slice() : [],
+      hand: R.hands[s].slice(), counts: R.hands.map(h => h.length), hands: end ? R.hands.map(h => h.slice()) : null,
+      table: R.table.map(m => ({ type: m.type, cards: m.cards.slice(), jr: Object.assign({}, m.jr), owner: m.owner, rank: m.rank, suit: m.suit, lo: m.lo, hi: m.hi })),
+      opened: R.opened.slice(), discard: R.discard.slice(), up: R.up, stockCount: R.stock.length, picked: R.picked.map(p => p.slice()),
+      log: R.log.map(e => e.slice()), res: R.res, turns: R.turns, over: M.over, winner: M.winner,
+      hist: M.hist.map(h => ({ n: h.n, winner: h.winner, pts: h.pts, left: h.left }))
+    };
+  }
+
+  /* ===================================================================
+     COMPUTER — one action at a time, from view(M, seat) only
+     =================================================================== */
+  const LV = {
+    0: { noise: .4, swap: false, layP: .5, takeGain: 99, danger: 0, keepJ: false },
+    1: { noise: .1, swap: true, layP: 1, takeGain: 8, danger: 0, keepJ: false },
+    2: { noise: 0, swap: true, layP: 1, takeGain: 5, danger: 1, keepJ: true, pot: true },
+    3: { noise: 0, swap: true, layP: 1, takeGain: 4, danger: 1.6, keepJ: true, pot: true, dump: true, live: true },
+    human: { noise: 0, swap: true, layP: 1, takeGain: 6, danger: .6, keepJ: false, pot: true }
+  };
+  const asT = v => v.table.map(m => Object.assign({}, m, { jr: Object.assign({}, m.jr) }));
+  /* how much a card is worth keeping: pairs and near-runs with other loose cards */
+  /* cards I haven't seen (copies matter: two decks) — for the expert's sense of which draws are still live */
+  function unseenOf(v) {
+    const cnt = new Array(52).fill(2);
+    const see = x => { if (!isJ(x)) cnt[base(x)]--; };
+    v.hand.forEach(see); v.discard.forEach(see); v.table.forEach(m => m.cards.forEach(see));
+    return cnt;
+  }
+  function keepLive(c, loose, U) {
+    if (isJ(c)) return 100;
+    const r = rk(c), s = su(c), at = (rr, ss) => (rr < 1 || rr > 13) ? 0 : Math.max(0, U[ss * 13 + rr - 1]);
+    let k = 0;
+    for (const o of loose) {
+      if (o === c || isJ(o)) continue;
+      if (rk(o) === r && su(o) !== s) { let live = 0; for (let q = 0; q < 4; q++) if (q !== s && q !== su(o)) live += at(r, q); k += 2 + live * 1.6; }
+      else if (su(o) === s && rk(o) !== r && Math.abs(rk(o) - r) <= 2) {
+        const lo = Math.min(r, rk(o)), hi = Math.max(r, rk(o));
+        const live = hi - lo === 1 ? at(lo - 1, s) + at(hi + 1, s) : at(lo + 1, s) * 1.4;
+        k += 2 + live * 1.6;
+      }
+    }
+    return k;
+  }
+  function keepVal(c, loose, L, U) {
+    if (L.live && U) return keepLive(c, loose, U);
+    if (isJ(c)) return 100;
+    let k = 0;
+    for (const o of loose) {
+      if (o === c || isJ(o)) continue;
+      if (rk(o) === rk(c) && su(o) !== su(c)) k += 6;
+      else if (su(o) === su(c) && Math.abs(rk(o) - rk(c)) <= 2 && rk(o) !== rk(c)) k += Math.abs(rk(o) - rk(c)) === 1 ? 6 : 4;
+    }
+    return L.pot ? k : k * .5;
+  }
+  function danger(c, v, L) {
+    if (!L.danger || isJ(c)) return 0;
+    let d = 0;
+    const nxt = (v.seat + 1) % v.n;
+    for (const m of v.table) if (fitLay(m, c, v.aceHigh)) d += v.opened[nxt] ? 4 : 1.5;
+    for (const k of v.picked[nxt]) { if (rk(k) === rk(c)) d += 3; else if (su(k) === su(c) && Math.abs(rk(k) - rk(c)) <= 2) d += 2.5; }
+    if (v.counts[nxt] <= 3) d += 2;
+    return d * L.danger;
+  }
+  function act(v, level, rnd) {
+    rnd = rnd || Math.random; const L = LV[level] || LV[1], s = v.seat, hand = v.hand, tp = v.discard[v.discard.length - 1];
+    if (v.phase === 'draw') {
+      if (tp == null) return { a: 'draw' };
+      if (isJ(tp) && level !== 0) return { a: 'take' };
+      const now = plan(hand, v.aceHigh, 'dw'), w = plan(hand.concat([tp]), v.aceHigh, 'dw');
+      const usedInMeld = w.melds.some(m => m.includes(tp));
+      const fitsTable = v.opened[s] && v.table.some(m => fitLay(m, tp, v.aceHigh));
+      // the gain: penalty fixed by the card, minus the card's own value (it joins the hand)
+      const gain = now.v - (w.v - (usedInMeld || fitsTable ? 0 : pen(tp)));
+      if ((usedInMeld || fitsTable) && gain >= L.takeGain) return { a: 'take' };
+      if (!v.opened[s] && usedInMeld) {               // would it let me open now?
+        const o0 = plan(hand, v.aceHigh, 'open').v, o1 = plan(hand.concat([tp]), v.aceHigh, 'open').v;
+        if (o1 >= v.threshold && o0 < v.threshold && level !== 0) return { a: 'take' };
+      }
+      return { a: 'draw' };
+    }
+    if (v.phase !== 'play') return null;
+    // 1) open
+    if (!v.opened[s]) {
+      const o = plan(hand, v.aceHigh, 'open');
+      if (o.v >= v.threshold) {
+        let melds = o.melds.slice(), left = hand.length - [].concat(...melds).length;
+        while (left < 1 && melds.length > 1) { melds.sort((a, b) => validMeld(a, v.aceHigh).value - validMeld(b, v.aceHigh).value); const m = melds.shift(); left += m.length; }
+        const tot = melds.reduce((t, m) => t + validMeld(m, v.aceHigh).value, 0);
+        if (tot >= v.threshold && left >= 1) return { a: 'open', melds };
+      }
+    } else {
+      // 2) swap a joker off the table when I hold the real card (and can use the joker)
+      if (L.swap && !v.must.length) {
+        for (let mi = 0; mi < v.table.length; mi++) for (const c of hand) {
+          if (isJ(c) || !swapFit(v.table[mi], c)) continue;
+          const T = asT(v); const canUse = T.some((m, k) => k !== mi && fitLay(m, 104, v.aceHigh)) || T[mi].type === 'run' || T[mi].cards.length < 4;
+          if (canUse && hand.length >= 2) return { a: 'swap', c, m: mi };
+        }
+      }
+      // 3) new melds from the hand (keep one card to throw)
+      const p = plan(hand, v.aceHigh, 'dw');
+      for (const m of p.melds) if (hand.length - m.length >= 1) {
+        if (L.keepJ && m.some(isJ) && !m.some(c => v.must.includes(c)) && hand.length > 4 && m.filter(c => !isJ(c)).length >= 3) {
+          const nat = m.filter(c => !isJ(c)); if (validMeld(nat, v.aceHigh)) return { a: 'meld', cards: nat };
+        }
+        return { a: 'meld', cards: m };
+      }
+      // 4) lay off loose cards (jokers I must use first)
+      const must = v.must.filter(c => hand.includes(c)), order = must.concat(p.loose.filter(c => !must.includes(c)));
+      for (const c of order) {
+        if (hand.length < 2) break;
+        if (isJ(c) && !must.includes(c) && L.keepJ && hand.length > 3) continue;
+        if (!must.includes(c) && rnd() > L.layP) continue;
+        for (let mi = 0; mi < v.table.length; mi++) if (fitLay(v.table[mi], c, v.aceHigh)) return { a: 'lay', c, m: mi };
+      }
+    }
+    // 5) throw: the loose card I least want, never a joker
+    const p = v.opened[s] ? plan(hand, v.aceHigh, 'dw') : plan(hand, v.aceHigh, 'dw');
+    const okThrow = c => !(c === v.took && v.tookFrom === 'd' && hand.length > 1);
+    let cand = p.loose.filter(c => !isJ(c) && okThrow(c));
+    if (!cand.length) cand = hand.filter(c => !isJ(c) && okThrow(c));
+    if (!cand.length) cand = hand.filter(okThrow);
+    const oppLow = v.counts.some((n, i) => i !== s && n <= 3);
+    const U = L.live ? unseenOf(v) : null;
+    const scored = cand.map(c => ({ c, sc: keepVal(c, p.loose, L, U) - pen(c) * (L.dump && oppLow ? 2.2 : 1) + danger(c, v, L) }));
+    scored.sort((a, b) => a.sc - b.sc);
+    // expert: look one draw ahead for the best few throws (sampled from the cards still unseen)
+    if (L.look && scored.length > 1) {
+      const U2 = unseenOf(v), pool = [];
+      U2.forEach((k, b) => { for (let i = 0; i < k; i++) pool.push(b); });
+      const T = v.table, opened = v.opened[s];
+      const metric = h => {
+        const pd = plan(h, v.aceHigh, 'dw');
+        let dw = pd.v;
+        if (opened) for (const c of pd.loose) if (T.some(m => fitLay(m, c, v.aceHigh))) dw -= pen(c);
+        if (!opened) { const ov = plan(h, v.aceHigh, 'open').v; dw += 2 * Math.max(0, v.threshold - ov); }
+        return dw;
+      };
+      const draws = []; for (let i = 0; i < L.look; i++) draws.push(pool[Math.floor(rnd() * pool.length)]);
+      let best = null;
+      for (const o of scored.slice(0, 4)) {
+        const h = hand.filter(x => x !== o.c); let t = 0;
+        for (const u of draws) t += metric(h.concat([u]));
+        const sc = t / draws.length + danger(o.c, v, L) * .5;
+        if (!best || sc < best.sc) best = { c: o.c, sc };
+      }
+      return { a: 'discard', c: best.c };
+    }
+    if (L.noise && rnd() < L.noise) return { a: 'discard', c: scored[Math.floor(rnd() * Math.min(3, scored.length))].c };
+    return { a: 'discard', c: scored[0].c };
+  }
+  return { newMatch, deal, nextRound, legal, apply, view, act, plan, validMeld, fitLay, swapFit, isJ, pen, LV, DEF };
+})();
+
+
 const LANG = {};
 /* ---- i18n/he.js ---- */
 LANG.he = {
@@ -1371,11 +1794,106 @@ cancel:"إلغاء", ok:"موافق",
 rulesHtml:"<h3>الهدف</h3><p>لاعبان. رتّب أوراقك العشر في <b>مجموعات</b> وأنهِ اليد بأقل <b>نقاط حرة</b> ممكنة. يفوز بالمباراة أول من يصل إلى الهدف.</p><h3>المجموعات</h3><ul><li><b>طقم</b> — 3 أو 4 أوراق من الرقم نفسه (7♠ 7♥ 7♦).</li><li><b>متتالية</b> — 3 أوراق أو أكثر متتالية من النوع نفسه (4♥ 5♥ 6♥). الآس منخفض فقط: A-2-3 نعم، Q-K-A لا.</li></ul><p>القيم: الآس 1، 2–10 حسب الرقم، J Q K تساوي 10. مع الأحجار، الألوان الأربعة هي الأنواع الأربعة و11–13 تساوي 10.</p><h3>التوزيع</h3><p>10 أوراق لكل لاعب وتُكشف ورقة. غير الموزع يأخذها أو يمرّر؛ ثم الموزع. إن مرّرا كلاهما يسحب غير الموزع من الرزمة.</p><h3>الدور</h3><p>اسحب ورقة — من الرزمة أو أعلى المرمى — وارمِ ورقة مكشوفة. لا يجوز رمي الورقة التي أخذتها للتو من المرمى.</p><h3>الطرق</h3><p>إن كانت نقاطك الحرة بعد الرمي <b>{knock} أو أقل</b> يمكنك الطرق. تُكشف اليدان. يمكن للخصم <b>إلحاق</b> أوراقه الحرة بمجموعاتك. إن كانت نقاطك أقل تحصل على الفرق. إن كانت نقاط الخصم مساوية أو أقل — <b>قطع</b>: يحصل على الفرق + 25.</p><h3>جين</h3><p>الطرق بصفر نقاط حرة هو <b>جين</b>: 25 + نقاط الخصم، ولا يجوز الإلحاق.</p><h3>التعادل</h3><p>إن بقيت ورقتان في الرزمة ولم يطرق أحد فاليد تعادل.</p><h3>نهاية المباراة</h3><p>يفوز أول من يصل إلى الهدف (عادة 100). مع المكافآت: +100 للمباراة، +25 لكل يد رابحة، وإن لم يسجل الخاسر شيئًا (تبييض) يتضاعف مجموع الفائز. الفائز باليد يوزع التالية.</p><h3>قواعد منزلية</h3><ul><li><b>جين كبير</b> — كل الأوراق الـ11 في مجموعات بعد السحب مباشرة: 31 + النقاط الحرة.</li><li>الهدف 50 / 100 / 150 / 250، المكافآت نعم/لا.</li></ul>"
 };
 
+/* ---- i18n/hor_he.js ---- */
+Object.assign(LANG.he, {
+upTo4:"עד 4 שחקנים בחדר. אפשר להשלים מקומות במחשבים.",
+addCpus:"להוסיף מחשבים",
+gameRunning:"המשחק כבר התחיל — תיכנס למשחק הבא",
+waTextHor:"בוא לשחק איתי רמי הורדות ב-RummyNest! קוד החדר: {0}",
+cpusN:"{0} מחשבים",
+handPts:"נקודות ביד",
+hor:"רמי הורדות", horSub:"2–4 שחקנים · 14 קלפים · הורדה ראשונה של 30",
+roundN:"סיבוב {0}", openN:"הורדה {0}", openedS:"הוריד", meldOf:"סדרה של {0}", tableEmpty:"עוד אין סדרות על השולחן",
+canOpen:"אפשר להוריד!", openNow:"הורד", nextRound:"סיבוב הבא", mustUseJ:"את הג'וקר שלקחת חייבים לשבץ בתור הזה",
+openMsg:"בחר קלפים לסדרה והוסף להורדה ({0} לפחות) — או זרוק קלף", playMsg:"הורד סדרות, הוסף קלף לסדרה (בחר קלף והקש על הסדרה), וזרוק קלף",
+addToOpen:"+ להורדה · {0}", buildMeld:"סדרה", putMeld:"הורד סדרה · {0}", notLegal:"המהלך הזה לא חוקי",
+meldTapHint:"בחר קלף אחד ואז הקש על סדרה כדי להוסיף אותו", openFirst:"קודם צריך הורדה ראשונה של {0}", keepOne:"צריך להשאיר קלף אחד לזריקה",
+noFit:"{0} לא מתאים לסדרה הזו", throwHint:"בחר קלף אחד לזריקה ואז הקש על הערימה",
+hOpen:"יש לך הורדה של {0} — סימנתי אותה, לחץ הורד", hMeld:"הורד את הסדרה שסימנתי", hLay:"הוסף את {0} לסדרה על השולחן", hSwap:"החלף בעזרת {0} את הג'וקר שעל השולחן",
+rNoWinner:"הקופה נגמרה — אין מנצח בסיבוב", youOut:"סיימת!", xOut:"{0} סיים!", leftInHand:"נשאר ביד", roundsWon:"{0} סיבובים",
+expertTwoOnly:"במשחק של 3–4 שחקנים יש עד רמה קשה: במדידות, למומחה לא היה שם יתרון אמיתי.", levelNoteHor:"כל רמה נמדדה מול הרמה שמתחתיה במאות משחקים.",
+jokersN:"{0} ג'וקרים", joker:"ג'וקר", openThr:"הורדה ראשונה", jokers:"ג'וקרים", aceHigh:"אס גם אחרי המלך", aceHighSub:"Q-K-A מותר (K-A-2 אף פעם לא)",
+rulesHorHtml:"<h2>רמי הורדות</h2><h3>הכנה</h3><p>2–4 שחקנים, שתי חפיסות וג'וקרים (לפי ההגדרות). כל אחד מקבל 14 קלפים, וקלף אחד נפתח לערימה.</p><h3>תור</h3><p>לוקחים קלף — מהקופה או מראש הערימה — ובסוף התור זורקים קלף. אסור לזרוק בחזרה את הקלף שלקחת עכשיו מהערימה.</p><h3>הורדה ראשונה</h3><p>בפעם הראשונה מורידים מהיד סדרות ששוות יחד <b>{thr} לפחות</b>. ערכים: 2–10 לפי המספר, J Q K שווים 10, אס 1 ב-A-2-3 ו-11 ב-Q-K-A או בסט. ג'וקר שווה את הקלף שהוא מחליף.</p><h3>אחרי ההורדה</h3><ul><li>מורידים סדרות חדשות.</li><li>מוסיפים קלפים לכל סדרה על השולחן — גם של אחרים: בוחרים קלף ומקישים על הסדרה.</li><li>מי שמחזיק את הקלף שג'וקר מחליף יכול לקחת את הג'וקר — וחייב לשבץ אותו באותו תור.</li></ul><h3>סדרות</h3><p>סט: 3–4 קלפים מאותו מספר בצורות שונות. רצף: 3 ומעלה ברצף מאותה צורה. בכל סדרה לפחות שני קלפים אמיתיים.</p><h3>סיום</h3><p>מנצח מי שזורק את הקלף האחרון שלו (צריך תמיד להשאיר קלף לזריקה). הוא מקבל את סכום הקלפים שנשארו אצל כל השאר; ג'וקר ביד שווה 30. אם הקופה נגמרת — מערבבים את הערימה פעם אחת; אם נגמרת שוב, הסיבוב בלי מנצח. מי שמגיע ראשון ליעד מנצח במשחק.</p>"
+});
+
+/* ---- i18n/hor_en.js ---- */
+Object.assign(LANG.en, {
+upTo4:"Up to 4 players. Empty seats can be filled with computers.",
+addCpus:"Add computers",
+gameRunning:"The game has already started — you'll join the next one",
+waTextHor:"Come play rummy with me on RummyNest! Room code: {0}",
+cpusN:"{0} computers",
+handPts:"Points in hand",
+hor:"Rummy (meld 30)", horSub:"2–4 players · 14 cards · first meld of 30",
+roundN:"round {0}", openN:"open {0}", openedS:"opened", meldOf:"{0}'s meld", tableEmpty:"No melds on the table yet",
+canOpen:"You can open!", openNow:"Open", nextRound:"Next round", mustUseJ:"The joker you took must be used this turn",
+openMsg:"Pick cards for a meld and add them to your opening ({0} or more) — or throw a card", playMsg:"Lay down melds, add a card to a meld (pick a card, tap the meld), then throw",
+addToOpen:"+ to opening · {0}", buildMeld:"Meld", putMeld:"Lay meld · {0}", notLegal:"That move isn't legal",
+meldTapHint:"Pick one card, then tap a meld to add it", openFirst:"First you need an opening of {0}", keepOne:"Keep one card to throw",
+noFit:"{0} doesn't fit that meld", throwHint:"Pick one card to throw, then tap the pile",
+hOpen:"You have an opening of {0} — I marked it, tap Open", hMeld:"Lay down the meld I marked", hLay:"Add {0} to a meld on the table", hSwap:"Use {0} to take the joker from the table",
+rNoWinner:"The stock ran out — no winner this round", youOut:"You're out!", xOut:"{0} is out!", leftInHand:"Left in hand", roundsWon:"{0} rounds",
+expertTwoOnly:"With 3–4 players the top level is Hard: in testing the expert had no real edge there.", levelNoteHor:"Each level was measured against the one below over hundreds of matches.",
+jokersN:"{0} jokers", joker:"Joker", openThr:"First meld", jokers:"Jokers", aceHigh:"Ace also above the king", aceHighSub:"Q-K-A allowed (K-A-2 never)",
+rulesHorHtml:"<h2>Rummy with a first meld</h2><h3>Setup</h3><p>2–4 players, two decks and jokers (see settings). 14 cards each; one card starts the discard pile.</p><h3>A turn</h3><p>Draw one card — from the stock or the top of the pile — and end by throwing one card. You can't throw back the card you just took from the pile.</p><h3>First meld</h3><p>The first time, lay down melds from your hand worth <b>{thr} or more</b> together. Values: 2–10 face value, J Q K 10, ace 1 in A-2-3 and 11 in Q-K-A or a set. A joker is worth the card it stands for.</p><h3>After opening</h3><ul><li>Lay down new melds.</li><li>Add cards to any meld on the table — anyone's: pick a card and tap the meld.</li><li>Holding the card a joker stands for lets you take that joker — and you must use it the same turn.</li></ul><h3>Melds</h3><p>Set: 3–4 of a rank in different suits. Run: 3+ in a row, same suit. Every meld needs at least two real cards.</p><h3>Ending</h3><p>Whoever throws their last card wins the round (always keep one card to throw) and scores everyone else's cards; a joker in hand counts 30. If the stock runs out the pile is reshuffled once; if it runs out again the round has no winner. First to the target wins the match.</p>"
+});
+
+/* ---- i18n/hor_ru.js ---- */
+Object.assign(LANG.ru, {
+upTo4:"До 4 игроков. Свободные места можно занять компьютерами.", addCpus:"Добавить компьютеры", gameRunning:"Игра уже идёт — вы войдёте в следующую", waTextHor:"Сыграем в рамми в RummyNest! Код комнаты: {0}", cpusN:"компьютеров: {0}", handPts:"Очки в руке",
+hor:"Рамми (выкладка 30)", horSub:"2–4 игрока · 14 карт · первая выкладка 30",
+roundN:"раунд {0}", openN:"выкладка {0}", openedS:"выложил", meldOf:"комбинация: {0}", tableEmpty:"На столе пока нет комбинаций",
+canOpen:"Можно выкладывать!", openNow:"Выложить", nextRound:"Следующий раунд", mustUseJ:"Взятого джокера нужно использовать в этот ход",
+openMsg:"Выберите карты для комбинации и добавьте к выкладке ({0} и больше) — или сбросьте карту", playMsg:"Выкладывайте комбинации, добавляйте карту к комбинации (выберите карту и коснитесь комбинации) и сбросьте",
+addToOpen:"+ к выкладке · {0}", buildMeld:"Комбинация", putMeld:"Выложить · {0}", notLegal:"Так ходить нельзя",
+meldTapHint:"Выберите одну карту, затем коснитесь комбинации", openFirst:"Сначала нужна выкладка {0}", keepOne:"Оставьте одну карту для сброса",
+noFit:"{0} не подходит к этой комбинации", throwHint:"Выберите одну карту и коснитесь сброса",
+hOpen:"У вас есть выкладка на {0} — я её отметил, нажмите «Выложить»", hMeld:"Выложите отмеченную комбинацию", hLay:"Добавьте {0} к комбинации на столе", hSwap:"Заберите джокера со стола с помощью {0}",
+rNoWinner:"Колода закончилась — в раунде нет победителя", youOut:"Вы вышли!", xOut:"{0} вышел!", leftInHand:"Осталось в руке", roundsWon:"раундов: {0}",
+expertTwoOnly:"При 3–4 игроках максимальный уровень — сложный: в тестах у эксперта там не было реального преимущества.", levelNoteHor:"Каждый уровень проверен против предыдущего на сотнях партий.",
+jokersN:"джокеров: {0}", joker:"Джокер", openThr:"Первая выкладка", jokers:"Джокеры", aceHigh:"Туз и после короля", aceHighSub:"Q-K-A можно (K-A-2 — никогда)",
+rulesHorHtml:"<h2>Рамми с первой выкладкой</h2><h3>Подготовка</h3><p>2–4 игрока, две колоды и джокеры. По 14 карт, одна карта открывает сброс.</p><h3>Ход</h3><p>Возьмите карту — из колоды или верхнюю из сброса — и закончите ход сбросом. Нельзя сразу сбросить карту, взятую из сброса.</p><h3>Первая выкладка</h3><p>В первый раз выложите из руки комбинации общей стоимостью <b>{thr} и больше</b>. 2–10 по номиналу, J Q K — 10, туз 1 в A-2-3 и 11 в Q-K-A или сете. Джокер стоит как карта, которую он заменяет.</p><h3>После выкладки</h3><ul><li>Выкладывайте новые комбинации.</li><li>Добавляйте карты к любой комбинации на столе: выберите карту и коснитесь комбинации.</li><li>Если у вас карта, которую заменяет джокер, можно забрать джокера — и использовать его в тот же ход.</li></ul><h3>Комбинации</h3><p>Сет: 3–4 карты одного значения разных мастей. Последовательность: 3+ подряд одной масти. В каждой комбинации минимум две настоящие карты.</p><h3>Конец</h3><p>Раунд выигрывает тот, кто сбросил последнюю карту, и получает сумму карт остальных; джокер в руке — 30. Если колода закончилась, сброс перемешивается один раз; если снова — раунд без победителя. Первый, кто наберёт цель, выигрывает партию.</p>"
+});
+
+/* ---- i18n/hor_es.js ---- */
+Object.assign(LANG.es, {
+upTo4:"Hasta 4 jugadores. Los huecos se pueden llenar con el ordenador.", addCpus:"Añadir ordenadores", gameRunning:"La partida ya empezó: entrarás en la siguiente", waTextHor:"¡Juega al rummy conmigo en RummyNest! Código de sala: {0}", cpusN:"{0} ordenadores", handPts:"Puntos en mano",
+hor:"Rummy (bajada 30)", horSub:"2–4 jugadores · 14 cartas · primera bajada de 30",
+roundN:"ronda {0}", openN:"bajada {0}", openedS:"bajó", meldOf:"combinación de {0}", tableEmpty:"Todavía no hay combinaciones en la mesa",
+canOpen:"¡Puedes bajar!", openNow:"Bajar", nextRound:"Siguiente ronda", mustUseJ:"El comodín que cogiste debe usarse en este turno",
+openMsg:"Elige cartas para una combinación y añádelas a tu bajada ({0} o más), o descarta", playMsg:"Baja combinaciones, añade una carta a una combinación (elige la carta y toca la combinación) y descarta",
+addToOpen:"+ a la bajada · {0}", buildMeld:"Combinación", putMeld:"Bajar · {0}", notLegal:"Esa jugada no es válida",
+meldTapHint:"Elige una carta y luego toca una combinación", openFirst:"Primero necesitas una bajada de {0}", keepOne:"Quédate una carta para descartar",
+noFit:"{0} no encaja en esa combinación", throwHint:"Elige una carta y toca el descarte",
+hOpen:"Tienes una bajada de {0}: la he marcado, pulsa Bajar", hMeld:"Baja la combinación marcada", hLay:"Añade {0} a una combinación de la mesa", hSwap:"Usa {0} para quitar el comodín de la mesa",
+rNoWinner:"Se acabó el mazo: ronda sin ganador", youOut:"¡Has cerrado!", xOut:"¡{0} cerró!", leftInHand:"Quedó en mano", roundsWon:"{0} rondas",
+expertTwoOnly:"Con 3–4 jugadores el nivel máximo es Difícil: en las pruebas el experto no tenía ventaja real.", levelNoteHor:"Cada nivel se midió contra el anterior en cientos de partidas.",
+jokersN:"{0} comodines", joker:"Comodín", openThr:"Primera bajada", jokers:"Comodines", aceHigh:"As también tras el rey", aceHighSub:"Q-K-A permitido (K-A-2 nunca)",
+rulesHorHtml:"<h2>Rummy con primera bajada</h2><h3>Preparación</h3><p>2–4 jugadores, dos barajas y comodines. 14 cartas cada uno; una carta empieza el descarte.</p><h3>Turno</h3><p>Roba una carta, del mazo o del descarte, y termina descartando una. No puedes descartar la carta que acabas de coger del descarte.</p><h3>Primera bajada</h3><p>La primera vez, baja de tu mano combinaciones que sumen <b>{thr} o más</b>. 2–10 su número, J Q K 10, as 1 en A-2-3 y 11 en Q-K-A o en un trío. El comodín vale la carta que sustituye.</p><h3>Después</h3><ul><li>Baja nuevas combinaciones.</li><li>Añade cartas a cualquier combinación de la mesa: elige la carta y toca la combinación.</li><li>Si tienes la carta que sustituye un comodín puedes llevártelo, y debes usarlo en el mismo turno.</li></ul><h3>Combinaciones</h3><p>Trío: 3–4 del mismo número y distinto palo. Escalera: 3+ seguidas del mismo palo. Al menos dos cartas reales en cada combinación.</p><h3>Final</h3><p>Gana la ronda quien descarta su última carta y suma las cartas de los demás; un comodín en mano vale 30. Si se acaba el mazo se baraja el descarte una vez; si vuelve a acabarse, la ronda no tiene ganador. Gana la partida quien llegue primero a la meta.</p>"
+});
+
+/* ---- i18n/hor_ar.js ---- */
+Object.assign(LANG.ar, {
+upTo4:"حتى 4 لاعبين. يمكن ملء المقاعد الفارغة بالكمبيوتر.", addCpus:"إضافة كمبيوتر", gameRunning:"بدأت اللعبة — ستنضم إلى التالية", waTextHor:"تعال العب معي رامي في RummyNest! رمز الغرفة: {0}", cpusN:"{0} كمبيوتر", handPts:"نقاط في اليد",
+hor:"رامي (تنزيل 30)", horSub:"2–4 لاعبين · 14 ورقة · أول تنزيل 30",
+roundN:"الجولة {0}", openN:"تنزيل {0}", openedS:"نزّل", meldOf:"مجموعة {0}", tableEmpty:"لا مجموعات على الطاولة بعد",
+canOpen:"يمكنك التنزيل!", openNow:"نزّل", nextRound:"الجولة التالية", mustUseJ:"الجوكر الذي أخذته يجب استخدامه في هذا الدور",
+openMsg:"اختر أوراق مجموعة وأضفها إلى التنزيل ({0} أو أكثر) — أو ارمِ ورقة", playMsg:"نزّل مجموعات، أضف ورقة إلى مجموعة (اختر الورقة ثم انقر المجموعة)، ثم ارمِ",
+addToOpen:"+ للتنزيل · {0}", buildMeld:"مجموعة", putMeld:"نزّل · {0}", notLegal:"هذه الحركة غير مسموحة",
+meldTapHint:"اختر ورقة واحدة ثم انقر على مجموعة", openFirst:"تحتاج أولًا إلى تنزيل {0}", keepOne:"أبقِ ورقة واحدة للرمي",
+noFit:"{0} لا تناسب هذه المجموعة", throwHint:"اختر ورقة واحدة ثم انقر على المرمى",
+hOpen:"لديك تنزيل بقيمة {0} — حددته لك، اضغط نزّل", hMeld:"نزّل المجموعة المحددة", hLay:"أضف {0} إلى مجموعة على الطاولة", hSwap:"خذ الجوكر من الطاولة باستخدام {0}",
+rNoWinner:"نفدت الرزمة — لا فائز في الجولة", youOut:"أنهيت!", xOut:"{0} أنهى!", leftInHand:"بقي في اليد", roundsWon:"{0} جولات",
+expertTwoOnly:"مع 3–4 لاعبين أعلى مستوى هو الصعب: في الاختبار لم يكن للخبير تفوق حقيقي.", levelNoteHor:"كل مستوى قيس مقابل الأدنى في مئات المباريات.",
+jokersN:"{0} جوكر", joker:"جوكر", openThr:"أول تنزيل", jokers:"الجوكر", aceHigh:"الآس بعد الملك أيضًا", aceHighSub:"Q-K-A مسموح (K-A-2 أبدًا)",
+rulesHorHtml:"<h2>رامي بتنزيل أول</h2><h3>التحضير</h3><p>2–4 لاعبين، رزمتان وجوكر. 14 ورقة لكل لاعب وتبدأ ورقة واحدة المرمى.</p><h3>الدور</h3><p>اسحب ورقة — من الرزمة أو أعلى المرمى — وأنهِ الدور برمي ورقة. لا يجوز رمي الورقة التي أخذتها للتو من المرمى.</p><h3>أول تنزيل</h3><p>في المرة الأولى نزّل من يدك مجموعات قيمتها معًا <b>{thr} أو أكثر</b>. 2–10 حسب الرقم، J Q K تساوي 10، الآس 1 في A-2-3 و11 في Q-K-A أو الطقم. الجوكر يساوي الورقة التي يحل محلها.</p><h3>بعد التنزيل</h3><ul><li>نزّل مجموعات جديدة.</li><li>أضف أوراقًا إلى أي مجموعة على الطاولة: اختر الورقة وانقر المجموعة.</li><li>إن كانت لديك الورقة التي يحل الجوكر محلها يمكنك أخذه — ويجب استخدامه في الدور نفسه.</li></ul><h3>المجموعات</h3><p>طقم: 3–4 من الرقم نفسه بأنواع مختلفة. متتالية: 3 أو أكثر متتالية من النوع نفسه. في كل مجموعة ورقتان حقيقيتان على الأقل.</p><h3>النهاية</h3><p>يفوز بالجولة من يرمي آخر أوراقه ويحصل على مجموع أوراق الآخرين؛ الجوكر في اليد يساوي 30. إن نفدت الرزمة يُخلط المرمى مرة واحدة؛ وإن نفدت مجددًا فلا فائز. أول من يصل إلى الهدف يفوز بالمباراة.</p>"
+});
+
 /* ---- app_core.js ---- */
 /* =====================================================================
    RummyNest — app core (storage · settings · screens · cards · sound)
    ===================================================================== */
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 const $ = s => document.querySelector(s), $$ = s => Array.from(document.querySelectorAll(s));
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const P = 'rummy_';
@@ -1398,7 +1916,8 @@ try { navigator.storage && navigator.storage.persist && navigator.storage.persis
 const DEF = {
   name: '', lang: 'he', theme: 'gold', mode: 'night', board: 'felt', skin: 'cards', four: false,
   sound: true, vib: true, sort: 'melds', memory: true, oneTap: true,
-  target: 100, bonuses: true, bigGin: false, level: 1, variant: 'gin', tutDone: false
+  target: 100, bonuses: true, bigGin: false, level: 1, variant: 'gin', tutDone: false,
+  horThr: 30, horJokers: 2, horAceHigh: true, horTarget: 300
 };
 const ST = Object.assign({}, DEF, LS.get('set', {}));
 const saveST = () => LS.set('set', ST);
@@ -1454,7 +1973,8 @@ const TCOL = ['tBlack', 'tRed', 'tOrange', 'tBlue'];
 function cardHTML(c, cls, attrs) {
   cls = cls || ''; attrs = attrs || '';
   if (c == null) return '<div class="pc bk ' + cls + '" ' + attrs + '></div>';
-  const s = RC.suit(c), r = RC.rank(c), sc = s === 1 ? 'red' : s === 2 ? 'red s2' : s === 3 ? 's3' : '';
+  if (c >= 104) return '<div class="pc jk ' + cls + '" data-c="' + c + '" ' + attrs + ' aria-label="' + esc(T('joker')) + '"><div class="ix">★</div><div class="jkf">🃏</div><div class="ix b">★</div><div class="tn"><b>☺</b>☺<i></i></div></div>';
+  const s = RC.suit(c % 52), r = RC.rank(c), sc = s === 1 ? 'red' : s === 2 ? 'red s2' : s === 3 ? 's3' : '';
   const mid = r > 10 ? '<div class="face">' + RL[r] + '</div>' : '<div class="pip">' + SUITS[s] + '</div>';
   return '<div class="pc ' + sc + ' t' + s + ' ' + cls + '" data-c="' + c + '" ' + attrs + ' aria-label="' + esc(cardName(c)) + '">' +
     '<div class="ix">' + RL[r] + '<s>' + SUITS[s] + '</s></div>' + mid + '<div class="ix b">' + RL[r] + '<s>' + SUITS[s] + '</s></div>' +
@@ -1463,10 +1983,12 @@ function cardHTML(c, cls, attrs) {
 /* text label — cards: "K♣", tiles: "13 blue"; always isolated so RTL text never flips it */
 function cardTxt(c) {
   if (c == null) return '';
+  if (c >= 104) return T('joker');
   if (ST.skin === 'tiles') return iso(RC.rank(c) + ' ' + T(TCOL[RC.suit(c)]));
   return iso(RL[RC.rank(c)] + SUITS[RC.suit(c)]);
 }
-function cardName(c) { return ST.skin === 'tiles' ? RC.rank(c) + ' ' + T(TCOL[RC.suit(c)]) : RL[RC.rank(c)] + SUITS[RC.suit(c)]; }
+function cardName(c) {
+  if (c >= 104) return T('joker'); return ST.skin === 'tiles' ? RC.rank(c) + ' ' + T(TCOL[RC.suit(c)]) : RL[RC.rank(c)] + SUITS[RC.suit(c)]; }
 
 /* runs that touch (4-5-6 + 7-8-9 of one suit) are shown as one run */
 function mergeRuns(melds) {
@@ -1553,21 +2075,24 @@ const FAST = /[?&]fast=1/.test(location.search);   // tests only: the computer m
 let SEL = null, NEWC = null, KNOCK_ARM = 0, aiT = null, PASS_ON = false, BUSY = false;
 const LVL = ['lvEasy', 'lvMed', 'lvHard', 'lvExpert'];
 const saveGame = () => { if (G) LS.set('game', G); else LS.del('game'); };
+const ENG = () => (G && G.var === 'hor') ? HOR : GIN;
+const rnd = M => M ? (M.H || M.R) : null;
 const isGuest = () => G && G.mode === 'online' && G.net && G.net.role === 'guest';
 const isHostOnline = () => G && G.mode === 'online' && !isGuest();
 
 function mySeat() {
   if (!G) return 0;
   if (G.mode === 'online') return G.net && G.net.seat != null ? G.net.seat : (isGuest() ? 1 : 0);
-  if (G.mode === 'two') return G.M.H.phase === 'end' ? (G.viewer != null ? G.viewer : 0) : G.M.H.turn;
+  if (G.mode === 'two') return rnd(G.M).phase === 'end' ? (G.viewer != null ? G.viewer : 0) : rnd(G.M).turn;
   return 0;
 }
 function curView() {
   if (!G) return null;
   if (isGuest()) return G.v;
-  return GIN.view(G.M, mySeat());
+  return ENG().view(G.M, mySeat());
 }
 function nameOf(v, s) {
+  if (v.g === 'hor') return horName(v, s);
   if (v.names && v.names[s]) return v.names[s];
   if (G && G.mode === 'cpu') return s === 1 ? T('computer') + ' · ' + T(LVL[G.level]) : (ST.name || T('you'));
   return s === v.seat ? T('you') : T('opponent');
@@ -1588,6 +2113,7 @@ function startTwo(n1, n2) {
 
 /* ---------- acting ---------- */
 function doAct(a) {
+  if (isHor()) return horDo(a);
   if (BUSY) return;
   const v = curView(); if (!v || v.phase === 'end' || v.turn !== v.seat) return;
   KNOCK_ARM = 0;
@@ -1610,12 +2136,12 @@ function animMine(a, v) {
 /* everything that happens after the match changed (local move, computer move, guest's move on the host) */
 function afterChange(fresh) {
   if (!G) return;
-  const H = G.M ? G.M.H : null;
+  const H = G.M ? rnd(G.M) : null;
   if (G.mode === 'two' && H && H.phase !== 'end' && G.lastTurn != null && G.lastTurn !== H.turn) PASS_ON = true;
   if (H) G.lastTurn = H.phase === 'end' ? null : H.turn;
   saveGame();
   if (isHostOnline()) netBroadcast();
-  if (H && H.phase === 'end' && !G.counted[G.id + ':' + G.M.handNo]) onHandEnd();
+  if (H && H.phase === 'end' && !G.counted[G.id + ':' + (G.M.handNo || G.M.roundNo)]) onHandEnd();
   renderGame();
   scheduleAI();
   if (fresh && G.mode === 'two') renderGame();
@@ -1623,22 +2149,31 @@ function afterChange(fresh) {
 
 /* ---------- the computer's turn (and the stand-in for a disconnected online friend) ---------- */
 function aiSeat() {
-  if (!G || !G.M || G.M.over || G.M.H.phase === 'end') return null;
-  if (G.mode === 'cpu' && G.M.H.turn === 1) return 1;
-  if (isHostOnline() && G.sub && G.M.H.turn === 1) return 1;
+  if (!G || !G.M || G.M.over || rnd(G.M).phase === 'end') return null;
+  const t = rnd(G.M).turn;
+  if (G.bots && G.bots[t] != null) return t;
+  if (G.mode === 'cpu' && !isHor() && t === 1) return 1;
+  if (isHostOnline() && G.subs && G.subs[t]) return t;
   return null;
 }
+const aiLevel = s => G.bots && G.bots[s] != null ? G.bots[s] : (G.mode === 'cpu' ? G.level : 2);
 function scheduleAI() {
   clearTimeout(aiT);
   const s = aiSeat(); if (s == null) return;
-  const H = G.M.H, slow = H.phase === 'disc' ? 750 : 650;
+  const H = rnd(G.M), slow = isHor() ? (H.phase === 'play' ? 520 : 600) : (H.phase === 'disc' ? 750 : 650);
   aiT = setTimeout(() => {
     if (aiSeat() !== s) return;
-    const lvl = G.mode === 'cpu' ? G.level : 2;
-    const a = GIN.act(GIN.view(G.M, s), lvl);
-    if (!a || !GIN.legal(G.M, s, a)) { logErr('ai illegal ' + JSON.stringify(a)); return; }
-    const top = G.M.H.discard[G.M.H.discard.length - 1];
-    GIN.apply(G.M, s, a);
+    const E = ENG(), a = E.act(E.view(G.M, s), aiLevel(s));
+    if (!a || !E.legal(G.M, s, a)) { logErr('ai illegal ' + JSON.stringify(a)); return; }
+    const R0 = rnd(G.M), top = R0.discard[R0.discard.length - 1];
+    E.apply(G.M, s, a);
+    if (isHor()) {
+      const el = $('#hOpps [data-seat="' + s + '"]');
+      if (a.a === 'discard') fly(el, $('#pDisc'), a.c); else if (a.a === 'take') fly($('#pDisc'), el, top); else if (a.a === 'draw') fly($('#pStock'), el, null, true);
+      beep(a.a === 'open' ? 'knock' : 'card'); afterChange();
+      if (rnd(G.M).phase !== 'end' && rnd(G.M).turn !== s && mySeat() === rnd(G.M).turn) beep('turn');
+      return;
+    }
     G.last = { s, a: a.a, c: a.a === 'take' ? top : (a.c != null ? a.c : null) };
     if (a.a === 'take') fly($('#pDisc'), $('#oHand'), top);
     else if (a.a === 'draw') fly($('#pStock'), $('#oHand'), null, true);
@@ -1651,6 +2186,7 @@ function scheduleAI() {
 
 /* ---------- hand end: stats, replays, sounds ---------- */
 function onHandEnd() {
+  if (isHor()) return horHandEnd();
   const M = G.M, H = M.H, res = H.res, key = G.id + ':' + M.handNo; G.counted[key] = 1;
   const me = G.mode === 'two' ? null : mySeat();
   if (res.type === 'gin' || res.type === 'biggin') beep('gin'); else if (res.type === 'knock') beep('knock');
@@ -1720,6 +2256,8 @@ function layoutHand(hand) {
 function setBtn(b, label, on, cls) { b.textContent = label; b.disabled = !on; b.className = 'btn ' + (cls || ''); }
 function renderGame() {
   if (SCREEN !== 'game' || !G) return;
+  if (isHor()) return renderHor();
+  ['#opp', '#oHand', '#oKnown'].forEach(q => $(q).classList.remove('hide')); ['#hOpps', '#hTable', '#hStage'].forEach(q => $(q).classList.add('hide'));
   const v = curView(); if (!v) { $('#gMsg').textContent = T('waitingHost'); return; }
   const s = v.seat, o = 1 - s, myTurn = v.turn === s && v.phase !== 'end', H = v;
   const hidden = G.mode === 'two' && PASS_ON && v.phase !== 'end';
@@ -1727,14 +2265,15 @@ function renderGame() {
   $('#gSub').textContent = T('toN', v.target);
   $('#gScore').textContent = iso(v.scores[s] + ' : ' + v.scores[o]);
   // opponent
-  $('#oName').textContent = nameOf(v, o) + (G.sub ? ' 🤖' : '');
+  $('#oName').textContent = nameOf(v, o) + (isSub(o) ? ' 🤖' : '');
   const stat = $('#oStat');
   if (v.phase === 'end') stat.textContent = '';
-  else if (v.turn === o) stat.textContent = G.mode === 'cpu' || G.sub ? T('thinking') : T('theirTurn');
+  else if (v.turn === o) stat.textContent = G.mode === 'cpu' || isSub(o) ? T('thinking') : T('theirTurn');
   else stat.textContent = lastActTxt(v, o);
   $('#opp').classList.toggle('turn', v.turn === o && v.phase !== 'end');
   const dot = $('#oDot');
-  dot.className = 'dot ' + (G.mode !== 'online' ? 'on' : (G.sub ? 'sub' : (rosterOnline(o) ? 'on' : '')));
+  dot.className = 'dot ' + (G.mode !== 'online' ? 'on' : (isSub(o) ? 'sub' : (rosterOnline(linkOf(o)) ? 'on' : '')));
+  $('.dwline [data-t]').textContent = T('deadwood');
   const nb = v.phase === 'end' ? 0 : v.oppCount, ow = innerWidth > innerHeight && innerHeight < 520 ? 26 : Math.max(26, Math.min(40, Math.round(($('#game').clientWidth || 400) / 12)));
   $('#oHand').innerHTML = Array.from({ length: nb }, () => cardHTML(null, '', 'style="--w:' + ow + 'px"')).join('');
   $$('#oHand .pc').forEach((p, i) => { if (i) p.style.marginLeft = (-ow * .62) + 'px'; });
@@ -1789,7 +2328,7 @@ function renderGame() {
   renderNet();
   // overlays that belong to the state
   if (hidden) showPass(v); else hidePass();
-  if (v.phase === 'end' && !$('#ovs .ov.res') && !G.resSeen) showResult(v);
+  if (v.phase === 'end' && !$('#ovs .ov') && !G.resSeen) showResult(v);
 }
 function lastActTxt(v, s) {
   for (let i = v.log.length - 1; i >= 0; i--) {
@@ -1814,6 +2353,7 @@ function hidePass() { const p = $('#passScr'); if (p) p.remove(); }
 
 /* ---------- input ---------- */
 function tapCard(c) {
+  if (isHor()) return horTapCard(c);
   const v = curView(); if (!v || v.phase === 'end') return;
   const myTurn = v.turn === v.seat;
   if (SEL === c) {
@@ -1823,12 +2363,14 @@ function tapCard(c) {
   KNOCK_ARM = 0; beep('card'); renderGame();
 }
 function tapStock() {
+  if (isHor()) return horPile('stock');
   const v = curView(); if (!v || v.turn !== v.seat || v.phase === 'end') return;
   if (v.phase === 'draw') doAct({ a: 'draw' });
   else if (v.phase === 'first') toast(T('firstMsg'));
   else toast(T('discMsg'));
 }
 function tapDiscard() {
+  if (isHor()) return horPile('disc');
   const v = curView(); if (!v || v.turn !== v.seat || v.phase === 'end') return;
   if (v.phase === 'first' || (v.phase === 'draw' && !v.noTake)) doAct({ a: 'take' });
   else if (v.phase === 'draw') toast(T('mustDraw'));
@@ -1836,6 +2378,7 @@ function tapDiscard() {
   else toast(T('discMsg'));
 }
 function btnA() {
+  if (isHor()) return horBtnA();
   const v = curView(); if (!v) return;
   if (v.phase === 'end') return showScores(v);
   if (v.turn !== v.seat) return;
@@ -1847,6 +2390,7 @@ function btnA() {
   }
 }
 function btnB() {
+  if (isHor()) return horBtnB();
   const v = curView(); if (!v) return;
   if (v.phase === 'end') { if (v.over) return showFinal(v); return nextHandAsk(); }
   if (v.turn !== v.seat) return;
@@ -1881,6 +2425,7 @@ function bindHand() {
     if (!d.moved) { tapCard(d.c); return; }
     if (e.type === 'pointerup' && overDiscard(e.clientX, e.clientY)) {
       const v = curView();
+      if (isHor() && v && v.turn === v.seat && v.phase === 'play') { SELS = [d.c]; horDo({ a: 'discard', c: d.c }); return; }
       if (v && v.turn === v.seat && v.phase === 'disc' && d.c !== v.took) { SEL = d.c; doAct({ a: 'discard', c: d.c }); return; }
       if (v && d.c === v.took) toast(T('noThrowBack'));
     }
@@ -1893,6 +2438,7 @@ function overDiscard(x, y) { const r = $('#pDisc').getBoundingClientRect(); retu
 
 /* ---------- hint (the expert, seeing only what you see) ---------- */
 function hint() {
+  if (isHor()) return horHint();
   const v = curView(); if (!v || v.turn !== v.seat || v.phase === 'end') return;
   G.hints = (G.hints || 0) + 1; saveGame();
   const a = GIN.act(v, 3), tp = v.discard[v.discard.length - 1];
@@ -1986,6 +2532,7 @@ function leaveGame() {
   clearTimeout(aiT); closeAllOv(); hidePass();
   if (G && G.mode === 'online') { netLeave(); return; }
   if (G && G.M && G.M.over) { G = null; saveGame(); }
+  SELS = []; STAGE = [];
   show('home'); renderHome();
 }
 function gameMenu() {
@@ -2003,7 +2550,7 @@ function gameMenu() {
     const k = e.target.closest('[data-k]'); if (!k) return; const key = k.dataset.k;
     closeOv(o);
     if (key === 'sort') { ST.sort = { melds: 'suit', suit: 'rank', rank: 'melds' }[ST.sort]; saveST(); renderGame(); }
-    else if (key === 'scores') showScores(v);
+    else if (key === 'scores') isHor() ? horScores(v) : showScores(v);
     else if (key === 'rules') { renderRules(); show('rules'); RULES_BACK = 'game'; }
     else if (key === 'skin') { ST.skin = ST.skin === 'tiles' ? 'cards' : 'tiles'; saveST(); applyLook(); renderGame(); }
     else if (key === 'sound') { ST.sound = !ST.sound; saveST(); }
@@ -2025,30 +2572,368 @@ function bindGame() {
   window.addEventListener('resize', () => { if (SCREEN === 'game') renderGame(); });
 }
 
+/* ---- hor_ui.js ---- */
+/* =====================================================================
+   RummyNest — רמי הורדות table (2–4 players)
+   ===================================================================== */
+let SELS = [], STAGE = [];                    // selected cards · melds staged for the opening
+const isHor = () => G && G.var === 'hor';
+
+function startHor(o) {
+  const n = o.players, M = HOR.newMatch({ players: n, threshold: ST.horThr, jokers: ST.horJokers, aceHigh: ST.horAceHigh, target: ST.horTarget,
+    names: o.names || Array(n).fill(''), dealer: Math.floor(Math.random() * n) });
+  const bots = {}; if (o.mode === 'cpu') for (let s = 1; s < n; s++) bots[s] = o.level;
+  G = { var: 'hor', mode: o.mode, level: o.level, bots, M, id: Date.now(), hints: 0, counted: {} };
+  SELS = []; STAGE = []; NEWC = null; saveGame(); show('game'); if (o.mode === 'two') PASS_ON = true; afterChange(true);
+}
+const SEATC = ['#e8b931', '#4aa8e8', '#e0566a', '#3fbf7f'];
+const horShort = (v, s) => G && G.bots && G.bots[s] != null ? T('computer') + (v.n > 2 ? ' ' + s : '') : horName(v, s);
+function horName(v, s) {
+  if (v.names && v.names[s]) return v.names[s];
+  if (G && G.bots && G.bots[s] != null) return T('computer') + (v.n > 2 ? ' ' + s : '') + ' · ' + T(LVL[G.bots[s]]);
+  return s === v.seat ? (ST.name || T('you')) : T('player') + ' ' + (s + 1);
+}
+
+/* ---------- my hand: melds first, loose cards after ---------- */
+function horArrange(hand, v) {
+  const h = hand.filter(c => !STAGE.some(m => m.includes(c)));
+  if (ST.sort === 'suit') return { groups: [h.sort((a, b) => RC.suit(a % 52) - RC.suit(b % 52) || RC.rank(a) - RC.rank(b) || a - b)], melded: new Set() };
+  if (ST.sort === 'rank') return { groups: [h.sort((a, b) => RC.rank(a) - RC.rank(b) || a - b)], melded: new Set() };
+  const p = HOR.plan(h, v.aceHigh, 'dw'), melded = new Set();
+  const ms = p.melds.map(m => HOR.validMeld(m, v.aceHigh).cards);
+  ms.forEach(m => m.forEach(c => melded.add(c)));
+  const loose = p.loose.slice().sort((a, b) => (HOR.isJ(a) ? 99 : RC.rank(a)) - (HOR.isJ(b) ? 99 : RC.rank(b)) || a - b);
+  return { groups: ms.concat(loose.length ? [loose] : []), melded, meldCount: ms.length };
+}
+function horLayoutHand(v) {
+  const el = $('#hand'), A = horArrange(v.hand, v), n = A.groups.reduce((t, g) => t + g.length, 0);
+  const W = Math.min(el.parentNode.clientWidth - 8, 640);
+  let cw = Math.max(40, Math.min(70, Math.round(W / 7)));
+  if (innerWidth > innerHeight && innerHeight < 520) cw = Math.min(cw, Math.round(innerHeight * .15));
+  const ch = Math.round(cw * (ST.skin === 'tiles' ? 1.32 : 1.42)), gap = A.groups.length > 1 ? 8 : 0, gaps = gap * (A.groups.length - 1);
+  const step = n > 1 ? Math.min(cw + 4, (W - cw - gaps) / (n - 1)) : 0;
+  el.style.width = Math.ceil((n - 1) * step + cw + gaps) + 'px'; el.style.setProperty('--hh', (ch + 30) + 'px');
+  let x = 0, html = '';
+  A.groups.forEach((g, gi) => {
+    const x0 = x;
+    g.forEach(c => { html += cardHTML(c, (SELS.includes(c) ? 'sel ' : '') + (c === NEWC ? 'new ' : '') + (v.must.includes(c) ? 'must' : ''), 'style="--w:' + cw + 'px;left:' + x.toFixed(1) + 'px" tabindex="0" role="button"'); x += step; });
+    if (ST.sort === 'melds' && gi < (A.meldCount || 0)) html += '<span class="grp" style="left:' + x0.toFixed(1) + 'px;width:' + (x - step - x0 + cw).toFixed(1) + 'px"></span>';
+    x += gap;
+  });
+  el.innerHTML = html;
+}
+
+/* ---------- render ---------- */
+function renderHor() {
+  const v = curView(); if (!v) return;
+  const s = v.seat, myTurn = v.turn === s && v.phase !== 'end', hidden = G.mode === 'two' && PASS_ON && v.phase !== 'end';
+  ['#opp', '#oHand', '#oKnown'].forEach(q => $(q).classList.add('hide'));
+  ['#hOpps', '#hTable'].forEach(q => $(q).classList.remove('hide'));
+  $('#gTitle').textContent = T('hor') + ' · ' + T('roundN', v.roundNo);
+  $('#gSub').textContent = T('toN', v.target) + ' · ' + T('openN', v.threshold);
+  $('#gScore').textContent = iso(String(v.scores[s]));
+  // opponents
+  let oh = '';
+  for (let k = 1; k < v.n; k++) {
+    const o = (s + k) % v.n, turn = v.turn === o && v.phase !== 'end';
+    const dot = G.mode !== 'online' || (G.bots && G.bots[o] != null) ? 'on' : (isSub(o) ? 'sub' : (rosterOnline(linkOf(o)) ? 'on' : ''));
+    oh += '<div class="hopp ' + (turn ? 'turn' : '') + '" data-seat="' + o + '" style="border-inline-start:4px solid ' + SEATC[o] + '"><span class="dot ' + dot + '"></span><b>' + esc(horShort(v, o)) + '</b><small>' + iso('🂠 ' + v.counts[o]) + ' · ' + iso(String(v.scores[o])) + (v.opened[o] ? ' · ✓' + esc(T('openedS')) : '') + '</small><small class="act">' + esc(turn ? (G.bots && G.bots[o] != null || (G.subs && G.subs[o]) ? T('thinking') : T('theirTurn')) : horLastAct(v, o)) + '</small></div>';
+  }
+  $('#hOpps').innerHTML = oh;
+  // table melds
+  const one = SELS.length === 1 ? SELS[0] : null, canLay = myTurn && v.phase === 'play' && v.opened[s];
+  const mw = Math.max(26, Math.min(34, Math.round(($('#game').clientWidth || 400) / 13)));
+  $('#hTable').innerHTML = v.table.length ? v.table.map((m, i) => {
+    const fit = canLay && one != null && (HOR.fitLay(m, one, v.aceHigh) || HOR.swapFit(m, one) != null);
+    return '<button class="hmeld ' + (fit ? 'fit' : '') + '" data-m="' + i + '" aria-label="' + esc(T('meldOf', horName(v, m.owner))) + '"><span class="own" style="background:' + SEATC[m.owner] + '"></span>' + m.cards.map(c => cardHTML(c, '', 'style="--w:' + mw + 'px"')).join('') + '</button>';
+  }).join('') : '<div class="muted hempty">' + esc(T('tableEmpty')) + '</div>';
+  // piles
+  const pw = Math.max(46, Math.min(64, Math.round(($('#game').clientWidth || 400) / 7)));
+  $('#stockStack').innerHTML = v.stockCount ? [0, 1].map(i => cardHTML(null, '', 'style="--w:' + pw + 'px;transform:translate(' + (-i * 2) + 'px,' + (-i * 2) + 'px)"')).join('') : '<div class="pc" style="--w:' + pw + 'px;opacity:.15"></div>';
+  $('#stockLbl').textContent = T('stock') + ' · ' + v.stockCount;
+  const tp = v.discard[v.discard.length - 1];
+  $('#discStack').innerHTML = tp != null ? cardHTML(tp, '', 'style="--w:' + pw + 'px;position:relative"') : '<div class="pc" style="--w:' + pw + 'px;opacity:.15"></div>';
+  $('#discLbl').textContent = T('discardPile');
+  $('#pDisc').classList.toggle('can', myTurn && v.phase === 'draw' && tp != null && !hidden);
+  $('#pStock').classList.toggle('can', myTurn && v.phase === 'draw' && !hidden);
+  // hand
+  SELS = SELS.filter(c => v.hand.includes(c)); STAGE = STAGE.filter(m => m.every(c => v.hand.includes(c)));
+  if (hidden) $('#hand').innerHTML = ''; else horLayoutHand(v);
+  const p = HOR.plan(v.hand, v.aceHigh, 'dw');
+  $('#myDw').textContent = hidden ? '–' : p.v; $('.dwline [data-t]').textContent = T('handPts');
+  $('#mySort').textContent = T('sort_' + ST.sort);
+  const ck = $('#canKnock'); ck.classList.add('hide');
+  if (myTurn && v.phase === 'play' && !v.opened[s] && !hidden) { const ov = HOR.plan(v.hand, v.aceHigh, 'open').v; if (ov >= v.threshold) { ck.textContent = T('canOpen'); ck.className = 'chip go'; } }
+  // stage bar (building the opening)
+  const sb = $('#hStage');
+  if (STAGE.length && myTurn && !hidden) {
+    const tot = STAGE.reduce((t, m) => t + HOR.validMeld(m, v.aceHigh).value, 0);
+    sb.classList.remove('hide');
+    sb.innerHTML = '<div class="stg">' + STAGE.map((m, i) => '<button class="hmeld" data-st="' + i + '">' + HOR.validMeld(m, v.aceHigh).cards.map(c => cardHTML(c, '', 'style="--w:28px"')).join('') + '</button>').join('') + '</div><div class="row" style="align-items:center"><b>' + iso(tot + ' / ' + v.threshold) + '</b><button class="btn" id="stCancel">✕ ' + esc(T('cancel')) + '</button><button class="btn main" id="stOpen" ' + (tot >= v.threshold ? '' : 'disabled') + '>✓ ' + esc(T('openNow')) + '</button></div>';
+  } else { sb.classList.add('hide'); sb.innerHTML = ''; }
+  // message + buttons
+  const msg = $('#gMsg'), A = $('#bA'), B = $('#bB');
+  const selMeld = SELS.length >= 3 ? HOR.validMeld(SELS, v.aceHigh) : null;
+  if (v.phase === 'end') { msg.textContent = ''; setBtn(A, T('scores'), true, 'ghosty'); setBtn(B, v.over ? T('matchOver') : T('nextRound'), true, 'main'); }
+  else if (!myTurn) { msg.textContent = T('waitFor', horName(v, v.turn)); setBtn(A, '…', false); setBtn(B, '…', false, 'main'); }
+  else if (v.phase === 'draw') { msg.textContent = T('drawMsg'); setBtn(A, T('fromStock'), true, 'main'); setBtn(B, tp != null ? T('takeX', cardTxt(tp)) : T('discardPile'), tp != null); }
+  else {
+    const mustLeft = v.must.filter(c => v.hand.includes(c));
+    msg.textContent = mustLeft.length ? T('mustUseJ') : !v.opened[s] ? T('openMsg', v.threshold) : T('playMsg');
+    if (!v.opened[s]) setBtn(A, selMeld ? T('addToOpen', selMeld.value) : T('buildMeld'), !!selMeld, selMeld ? 'hot' : '');
+    else setBtn(A, selMeld ? T('putMeld', selMeld.value) : T('buildMeld'), !!selMeld && v.hand.length - SELS.length >= 1, selMeld ? 'hot' : '');
+    const thOk = isGuest() ? one != null && !mustLeft.length && !(one === v.took && v.tookFrom === 'd' && v.hand.length > 1) : one != null && HOR.legal(G.M, s, { a: 'discard', c: one });
+    setBtn(B, one != null ? T('throwX', cardTxt(one)) : T('throw'), !!thOk && !STAGE.length, 'main');
+    if (one != null && one === v.took && v.tookFrom === 'd' && v.hand.length > 1) msg.textContent = T('noThrowBack');
+  }
+  if (hidden) { setBtn(A, '…', false); setBtn(B, '…', false, 'main'); }
+  $('#bHint').disabled = !myTurn || hidden; $('#bHint').classList.toggle('hide', G.mode === 'online');
+  renderNet();
+  if (hidden) showPass(v); else hidePass();
+  if (v.phase === 'end' && !$('#ovs .ov') && !G.resSeen) horResult(v);
+}
+function horLastAct(v, s) {
+  for (let i = v.log.length - 1; i >= 0; i--) {
+    const e = v.log[i]; if (e[0] !== s) continue;
+    if (e[1] === 'discard') return T('threwX', cardTxt(e[2]));
+    if (e[1] === 'open') return T('openedS');
+    if (e[1] === 'take') return T('tookX', cardTxt(e[2]));
+    if (e[1] === 'draw') return T('drewStock');
+    return '';
+  }
+  return '';
+}
+
+/* ---------- input ---------- */
+function horTapCard(c) {
+  const v = curView(); if (!v || v.phase === 'end') return;
+  SELS = SELS.includes(c) ? SELS.filter(x => x !== c) : SELS.concat([c]);
+  beep('card'); renderGame();
+}
+function horDo(a) {
+  if (BUSY) return;
+  const v = curView(); if (!v || v.turn !== v.seat || v.phase === 'end') return;
+  if (isGuest()) { BUSY = true; setTimeout(() => { BUSY = false; }, 1500); netAct(a); SELS = []; beep('card'); return; }
+  if (!HOR.legal(G.M, v.seat, a)) { beep('err'); buzz(30); toast(T('notLegal')); return; }
+  if (a.a === 'draw') fly($('#pStock'), $('#hand'), null, true); else if (a.a === 'take') fly($('#pDisc'), $('#hand'), v.discard[v.discard.length - 1]);
+  else if (a.a === 'discard') fly($('#hand .pc[data-c="' + a.c + '"]'), $('#pDisc'), a.c);
+  const before = v.hand.slice();
+  HOR.apply(G.M, v.seat, a); beep(a.a === 'open' ? 'knock' : 'card'); buzz(12);
+  const after = HOR.view(G.M, v.seat).hand;
+  NEWC = a.a === 'draw' || a.a === 'take' ? after.find(c => !before.includes(c)) : a.a === 'swap' ? after.find(c => HOR.isJ(c) && !before.includes(c)) : null;
+  SELS = a.a === 'swap' ? [NEWC] : [];
+  if (a.a === 'open' || a.a === 'discard') STAGE = [];
+  G.last = { s: v.seat, a: a.a };
+  afterChange();
+}
+function horTapMeld(i) {
+  const v = curView(); if (!v || v.turn !== v.seat || v.phase !== 'play') { toast(T('meldTapHint')); return; }
+  if (!v.opened[v.seat]) { toast(T('openFirst', v.threshold)); return; }
+  if (SELS.length !== 1) { toast(T('meldTapHint')); return; }
+  const c = SELS[0], m = v.table[i];
+  if (HOR.swapFit(m, c) != null) return horDo({ a: 'swap', c, m: i });
+  if (HOR.fitLay(m, c, v.aceHigh)) {
+    if (v.hand.length < 2) { toast(T('keepOne')); return; }
+    return horDo({ a: 'lay', c, m: i });
+  }
+  beep('err'); toast(T('noFit', cardTxt(c)));
+}
+function horBtnA() {
+  const v = curView(); if (!v) return;
+  if (v.phase === 'end') return horScores(v);
+  if (v.turn !== v.seat) return;
+  if (v.phase === 'draw') return horDo({ a: 'draw' });
+  const vm = SELS.length >= 3 ? HOR.validMeld(SELS, v.aceHigh) : null; if (!vm) return;
+  if (!v.opened[v.seat]) {
+    const staged = [].concat(...STAGE).length + SELS.length;
+    if (v.hand.length - staged < 1) { toast(T('keepOne')); return; }
+    STAGE.push(SELS.slice()); SELS = []; beep('card'); renderGame(); return;
+  }
+  horDo({ a: 'meld', cards: SELS.slice() });
+}
+function horBtnB() {
+  const v = curView(); if (!v) return;
+  if (v.phase === 'end') { if (v.over) return horFinal(v); return horNext(); }
+  if (v.turn !== v.seat) return;
+  if (v.phase === 'draw') return horDo({ a: 'take' });
+  if (SELS.length === 1) horDo({ a: 'discard', c: SELS[0] });
+}
+function horPile(which) {
+  const v = curView(); if (!v || v.turn !== v.seat || v.phase === 'end') return;
+  if (v.phase === 'draw') return horDo({ a: which === 'stock' ? 'draw' : 'take' });
+  if (which === 'disc' && SELS.length === 1) return horDo({ a: 'discard', c: SELS[0] });
+  toast(T('throwHint'));
+}
+function horHint() {
+  const v = curView(); if (!v || v.turn !== v.seat || v.phase === 'end') return;
+  G.hints = (G.hints || 0) + 1; saveGame();
+  const a = HOR.act(v, v.n > 2 ? 2 : 3); let t = '';
+  if (a.a === 'draw') t = T('hDraw'); else if (a.a === 'take') t = T('hTake', cardTxt(v.discard[v.discard.length - 1]));
+  else if (a.a === 'open') { STAGE = a.melds.map(m => m.slice()); SELS = []; t = T('hOpen', a.melds.reduce((x, m) => x + HOR.validMeld(m, v.aceHigh).value, 0)); }
+  else if (a.a === 'meld') { SELS = a.cards.slice(); t = T('hMeld'); }
+  else if (a.a === 'lay') { SELS = [a.c]; t = T('hLay', cardTxt(a.c)); }
+  else if (a.a === 'swap') { SELS = [a.c]; t = T('hSwap', cardTxt(a.c)); }
+  else if (a.a === 'discard') { SELS = [a.c]; t = T('hThrow', cardTxt(a.c)); }
+  renderGame(); toast('💡 ' + t, 5200);
+}
+
+/* ---------- round end / match end ---------- */
+function horResult(v) {
+  closeAllOv();
+  const res = v.res, s = v.seat;
+  let h = '<h3>' + esc(res.winner == null ? T('rNoWinner') : (res.winner === s && G.mode !== 'two' ? T('youOut') : T('xOut', horName(v, res.winner)))) + '</h3>';
+  if (res.winner != null) h += '<div class="big">' + esc(horName(v, res.winner)) + ' ' + iso('+' + res.pts) + '</div>';
+  h += '<table class="tbl"><tr><th></th><th>' + esc(T('leftInHand')) + '</th><th>' + esc(T('total')) + '</th></tr>';
+  for (let k = 0; k < v.n; k++) {
+    const o = (s + k) % v.n, cards = v.hands ? v.hands[o] : [];
+    h += '<tr><td style="text-align:start">' + esc(horName(v, o)) + (o === res.winner ? ' 🏁' : '') + '</td><td><div style="display:flex;flex-wrap:wrap;gap:2px;direction:ltr;justify-content:center">' + cards.map(c => cardHTML(c, '', 'style="--w:24px"')).join('') + '</div>' + (o === res.winner ? '' : '<small>' + res.left[o] + '</small>') + '</td><td>' + v.scores[o] + '</td></tr>';
+  }
+  h += '</table><div id="readyLine" class="muted" style="text-align:center;min-height:20px"></div><div class="row"><button class="btn" data-x>' + esc(T('viewTable')) + '</button><button class="btn main" data-n>' + esc(v.over ? T('matchOver') : (G.mode === 'online' ? T('ready') : T('nextRound'))) + '</button></div>';
+  const ov = overlay(h, 'res'); ov.querySelector('.box').classList.add('res');
+  ov.querySelector('[data-x]').onclick = () => { G.resSeen = true; closeOv(ov); renderGame(); };
+  ov.querySelector('[data-n]').onclick = () => { if (v.over) { closeOv(ov); horFinal(v); } else horNext(); };
+  if (typeof renderReadyLine === 'function') renderReadyLine();
+}
+function horNext() {
+  if (G.mode === 'online') { netReady(); return; }
+  closeAllOv(); G.resSeen = false; HOR.nextRound(G.M); NEWC = null; SELS = []; STAGE = [];
+  if (G.mode === 'two') PASS_ON = true;
+  afterChange(true);
+}
+function horScores(v) {
+  const order = Array.from({ length: v.n }, (_, k) => (v.seat + k) % v.n);
+  const rows = v.hist.map(h => '<tr><td>' + h.n + '</td>' + order.map(o => '<td>' + (h.winner === o ? '+' + h.pts : '') + '</td>').join('') + '</tr>').join('');
+  const o = overlay('<h3>' + esc(T('scores')) + '</h3><div style="overflow-x:auto"><table class="tbl"><tr><th>#</th>' + order.map(x => '<th>' + esc(horName(v, x)) + '</th>').join('') + '</tr>' + rows + '<tr><th>' + esc(T('total')) + '</th>' + order.map(x => '<th>' + v.scores[x] + '</th>').join('') + '</tr></table></div><p class="muted">' + esc(T('toN', v.target)) + '</p><div class="row"><button class="btn main" data-c>' + esc(T('close')) + '</button></div>', 'center');
+  o.querySelector('[data-c]').onclick = () => closeOv(o);
+}
+function horFinal(v) {
+  closeAllOv();
+  const rank = Array.from({ length: v.n }, (_, i) => i).sort((a, b) => v.scores[b] - v.scores[a]), won = v.winner === v.seat;
+  const head = G.mode === 'two' ? T('winsX', horName(v, v.winner)) : won ? T('youWon') : T('youLost');
+  const ov = overlay('<div style="font-size:54px;text-align:center">' + (won || G.mode === 'two' ? '🏆' : '🃏') + '</div><h3 style="text-align:center">' + esc(head) + '</h3><table class="tbl">' +
+    rank.map((o, i) => '<tr><td>' + ['🥇', '🥈', '🥉', '4'][i] + '</td><td style="text-align:start">' + esc(horName(v, o)) + '</td><td>' + v.scores[o] + '</td><td class="muted">' + esc(T('roundsWon', v.wins[o])) + '</td></tr>').join('') + '</table>' +
+    '<div id="readyLine" class="muted" style="text-align:center;min-height:20px"></div><div class="row" style="margin-top:10px"><button class="btn" data-h>' + esc(T('home')) + '</button><button class="btn main" data-r>' + esc(T('rematch')) + '</button></div>', 'center');
+  ov.querySelector('[data-h]').onclick = () => { closeOv(ov); leaveGame(); };
+  ov.querySelector('[data-r]').onclick = () => { if (G.mode === 'online') { netReady(); return; } closeOv(ov); horRematch(); };
+  if (typeof renderReadyLine === 'function') renderReadyLine();
+}
+function horRematch() {
+  const M0 = G.M;
+  G.M = HOR.newMatch({ players: M0.n, threshold: M0.threshold, jokers: M0.jokers, aceHigh: M0.aceHigh, target: M0.target, names: M0.names.slice(), dealer: (M0.R.dealer + 1) % M0.n });
+  G.id = Date.now(); G.hints = 0; G.resSeen = false; NEWC = null; SELS = []; STAGE = [];
+  if (G.mode === 'two') PASS_ON = true;
+  afterChange(true);
+}
+function bindHor() {
+  $('#hTable').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (b && isHor()) horTapMeld(+b.dataset.m); });
+  $('#hStage').addEventListener('click', e => {
+    if (!isHor()) return;
+    const st = e.target.closest('[data-st]'); if (st) { STAGE.splice(+st.dataset.st, 1); renderGame(); return; }
+    if (e.target.closest('#stCancel')) { STAGE = []; renderGame(); return; }
+    if (e.target.closest('#stOpen')) horDo({ a: 'open', melds: STAGE.map(m => m.slice()) });
+  });
+}
+
+/* ---------- home: choose players / level / names ---------- */
+function horSetup(mode) {
+  const n0 = LS.get('horN', 2);
+  let h = '<h3>' + esc(T('hor')) + ' · ' + esc(mode === 'cpu' ? T('vsCpu') : T('twoPhone')) + '</h3><label class="f">' + esc(T('players')) + '</label><div class="seg" id="hsN">' + [2, 3, 4].map(n => '<button data-v="' + n + '" class="' + (n === n0 ? 'on' : '') + '">' + n + '</button>').join('') + '</div>';
+  if (mode === 'cpu') h += '<label class="f">' + esc(T('chooseLevel')) + '</label><div class="lvls" id="hsL"></div><p class="muted" id="hsNote"></p>';
+  else h += '<div id="hsNames"></div>';
+  h += '<p class="muted" style="margin:8px 0 0">' + esc(T('openN', ST.horThr) + ' · ' + T('toN', ST.horTarget) + ' · ' + T('jokersN', ST.horJokers)) + ' · <a href="#" id="qrSet" style="color:var(--acc)">' + esc(T('change')) + '</a></p><div class="row" style="margin-top:12px"><button class="btn ghosty" data-c>' + esc(T('cancel')) + '</button><button class="btn main" data-g>' + esc(T('startGame')) + '</button></div>';
+  const o = overlay(h); let n = n0, lvl = Math.min(ST.level, 3);
+  const draw = () => {
+    if (mode === 'cpu') {
+      const max = n > 2 ? 2 : 3; if (lvl > max) lvl = max;
+      $('#hsL').innerHTML = LVL.slice(0, max + 1).map((k, i) => '<button class="btn ' + (i === lvl ? 'main' : '') + '" data-l="' + i + '">' + esc(T(k)) + '</button>').join('');
+      $('#hsNote').textContent = n > 2 ? T('expertTwoOnly') : T('levelNoteHor');
+    } else {
+      const prev = LS.get('horNames', []);
+      $('#hsNames').innerHTML = Array.from({ length: n }, (_, i) => '<label class="f">' + esc(T('player') + ' ' + (i + 1)) + '</label><input class="in" data-pn="' + i + '" maxlength="20" value="' + esc(prev[i] || (i === 0 && ST.name) || T('player') + ' ' + (i + 1)) + '">').join('');
+    }
+  };
+  draw();
+  o.addEventListener('click', e => {
+    const nb = e.target.closest('#hsN [data-v]'); if (nb) { n = +nb.dataset.v; $$('#hsN button').forEach(b => b.classList.toggle('on', b === nb)); draw(); return; }
+    const lb = e.target.closest('[data-l]'); if (lb) { lvl = +lb.dataset.l; draw(); return; }
+    if (e.target.closest('[data-c]')) { closeOv(o); return; }
+    if (e.target.closest('[data-g]')) {
+      LS.set('horN', n);
+      if (mode === 'cpu') { ST.level = lvl; saveST(); closeOv(o); startHor({ mode, players: n, level: lvl }); }
+      else { const names = $$('[data-pn]').map((x, i) => x.value.trim() || T('player') + ' ' + (i + 1)); LS.set('horNames', names); closeOv(o); startHor({ mode, players: n, names }); }
+    }
+  });
+}
+
+function horHandEnd() {
+  const M = G.M, R = M.R, res = R.res; G.counted[G.id + ':' + M.roundNo] = 1;
+  const me = G.mode === 'two' ? null : mySeat();
+  beep(res.winner === me || me == null ? 'gin' : 'knock');
+  const S = LS.get('stats', {}), k = 'hor_' + (G.mode === 'cpu' ? 'cpu' + G.level : G.mode);
+  const b = S[k] = S[k] || { mp: 0, mw: 0, hp: 0, hw: 0, best: 0 };
+  b.hp++; if (me != null && res.winner === me) { b.hw++; b.best = Math.max(b.best, res.pts); }
+  if (M.over && !G.counted['m' + G.id]) { G.counted['m' + G.id] = 1; b.mp++; if (me != null && M.winner === me) b.mw++; beep(me == null || M.winner === me ? 'win' : 'lose'); }
+  LS.set('stats', S);
+  const RP = LS.get('replays', []), vv = HOR.view(M, 0);
+  RP.unshift({ var: 'hor', d: Date.now(), mode: G.mode, names: Array.from({ length: M.n }, (_, i) => horName(vv, i)), seat: me == null ? 0 : me, seed: R.seed, dealer: R.dealer, log: R.log.slice(), n: M.n, jokers: M.jokers, threshold: M.threshold, aceHigh: M.aceHigh, winner: res.winner, pts: res.pts });
+  RP.length = Math.min(RP.length, 10); LS.set('replays', RP); saveGame();
+}
+/* replay of a round: seed + moves → the engine rebuilds every step */
+function horReplay(r) {
+  const M = HOR.newMatch({ seed: r.seed, players: r.n, dealer: r.dealer, jokers: r.jokers, threshold: r.threshold, aceHigh: r.aceHigh, target: 1e9 });
+  const frames = [JSON.parse(JSON.stringify(M.R))];
+  for (const e of r.log) {
+    const [s, a] = e, act = { a };
+    if (a === 'take' || a === 'draw') {} else if (a === 'discard') act.c = e[2]; else if (a === 'open') act.melds = e[2]; else if (a === 'meld') act.cards = e[2]; else if (a === 'lay' || a === 'swap') { act.c = e[2]; act.m = e[3]; }
+    if (!HOR.apply(M, s, act)) break; frames.push(JSON.parse(JSON.stringify(M.R)));
+  }
+  let i = 0, auto = null;
+  const o = overlay('<h3>' + esc(T('replay')) + '</h3><div class="rp" id="rpBody"></div><div class="row" dir="ltr" style="margin-top:10px"><button class="btn" data-k="0">⏮</button><button class="btn" data-k="-1">◀</button><button class="btn main" data-k="p">▶</button><button class="btn" data-k="1">▶|</button><button class="btn" data-k="9">⏭</button></div><div class="row" style="margin-top:8px"><button class="btn ghosty" data-k="x">' + esc(T('close')) + '</button></div>', 'center');
+  const srt = h => h.slice().sort((a, b) => (a >= 104) - (b >= 104) || RC.suit(a % 52) - RC.suit(b % 52) || RC.rank(a) - RC.rank(b));
+  const say = e => { const nm = r.names[e[0]] || ''; const k = e[1]; return nm + ': ' + (k === 'take' ? T('tookX', cardTxt(e[2])) : k === 'draw' ? T('drewStock') : k === 'discard' ? T('threwX', cardTxt(e[2])) : k === 'open' ? T('openedS') : k === 'meld' ? T('buildMeld') : k === 'lay' ? T('hLay', cardTxt(e[2])) : k === 'swap' ? T('hSwap', cardTxt(e[2])) : k); };
+  function draw() {
+    const R = frames[i];
+    $('#rpBody').innerHTML = R.hands.map((h, s) => '<div><b>' + esc(r.names[s] || '') + '</b><div class="hrow">' + srt(h).map(c => cardHTML(c)).join('') + '</div></div>').join('') +
+      '<div class="hrow" style="gap:6px">' + R.table.map(m => '<span style="display:inline-flex;gap:1px;padding:2px;border-radius:6px;background:rgba(0,0,0,.15)">' + m.cards.map(c => cardHTML(c, '', 'style="--w:22px"')).join('') + '</span>').join('') + '</div>' +
+      '<p style="text-align:center;min-height:40px">' + esc(i ? say(r.log[i - 1]) : T('dealt')) + (i === frames.length - 1 && R.res && R.res.winner != null ? ' — ' + esc(T('xOut', r.names[R.res.winner])) + ' +' + R.res.pts : '') + '</p><p class="muted" style="text-align:center">' + iso(i + ' / ' + (frames.length - 1)) + '</p>';
+  }
+  o.addEventListener('click', e => {
+    const k = e.target.closest('[data-k]'); if (!k) return; const v = k.dataset.k;
+    if (v === 'x') { clearInterval(auto); closeOv(o); return; }
+    if (v === 'p') { if (auto) { clearInterval(auto); auto = null; k.textContent = '▶'; } else { k.textContent = '⏸'; auto = setInterval(() => { if (i < frames.length - 1) { i++; draw(); } else { clearInterval(auto); auto = null; k.textContent = '▶'; } }, 700); } return; }
+    i = v === '0' ? 0 : v === '9' ? frames.length - 1 : Math.max(0, Math.min(frames.length - 1, i + +v)); draw();
+  });
+  draw();
+}
+
 /* ---- online.js ---- */
 /* =====================================================================
-   RummyNest — online (NestLink 1.1). The host holds the whole match and
-   sends the friend only their own view; the friend sends intents.
+   RummyNest — online (NestLink 1.1), Gin (2) and רמי הורדות (2–4 + computers)
+   The host holds the whole match; each friend gets only their own view and sends intents.
+   Match seats (0..n-1) map to NestLink seats through G.map (a friend who left leaves a hole).
    ===================================================================== */
 let LINK = null, subT = null;
 function initLink() {
   LINK = NestLink.create({
-    app: 'rummynest', version: APP_VERSION, maxPlayers: 2,
+    app: 'rummynest', version: APP_VERSION, maxPlayers: 4,
     name: () => ST.name || T('player'),
     persist: sess => { if (G && G.mode === 'online') { G.net.sess = sess; if (sess && sess.seat != null) G.net.seat = sess.seat; saveGame(); } },
     onStatus: () => { renderNet(); if (SCREEN === 'lobby') renderLobby(); },
-    onCode: () => { if (SCREEN === 'lobby') renderLobby(); },
-    onJoin: seat => { if (!isHostOnline()) return; LINK.sendTo(seat, { type: 'lobby', cfg: G.cfg }); if (G.M) netBroadcast(); },
+    onJoin: seat => { if (!isHostOnline()) return; LINK.sendTo(seat, { type: 'lobby', cfg: G.cfg, var: G.var }); if (G.M) { if (!G.map.includes(seat)) LINK.sendTo(seat, { type: 'full' }); netBroadcast(); } },
     onRoster: () => {
-      if (isHostOnline()) {
-        if (G.M && rosterOnline(1)) { if (G.sub) { G.sub = false; toast(T('friendBack', nameAt(1))); } G.offSince = null; G.M.names[1] = nameAt(1) || G.M.names[1]; netBroadcast(); }
+      if (isHostOnline() && G.M && G.map) {
+        for (let ms = 1; ms < G.map.length; ms++) if (G.map[ms] != null && rosterOnline(G.map[ms])) {
+          if (G.subs[ms]) { G.subs[ms] = false; toast(T('friendBack', nameAt(G.map[ms]))); }
+          G.off[ms] = null; if (nameAt(G.map[ms])) G.M.names[ms] = nameAt(G.map[ms]);
+        }
+        netBroadcast();
       }
       if (SCREEN === 'lobby') renderLobby(); else renderGame();
     },
     onMessage: (m, from) => netMsg(m, from),
-    onEmoji: (e, from) => bubble(from, e),
-    onTalk: (seat, on) => { if (seat !== LINK.seat) { const st = $('#oStat'); if (st && on) st.textContent = '🎙 ' + T('talking'); else renderGame(); } },
-    onVoiceMsg: (url, sec, seat, mine) => voiceMsg(url, sec, seat, mine),
+    onEmoji: (e, from) => bubble(msOf(from), e),
+    onTalk: (seat, on) => { if (seat !== LINK.seat && on) toast('🎙 ' + (nameAt(seat) || T('player')) + ' ' + T('talking'), 1500); },
+    onVoiceMsg: (url, sec, seat, mine) => voiceMsg(url, sec, msOf(seat), mine),
     onRecState: on => { const b = $('#vRec'); if (b) { b.classList.toggle('on', on); b.textContent = on ? '⏹ ' + T('stop') : '⏺'; } },
     onMicError: () => toast(T('micDenied'), 4000),
     onAudioBlocked: () => toast(T('tapToHear'), 4000),
@@ -2056,7 +2941,11 @@ function initLink() {
   });
 }
 const nameAt = s => { const p = LINK && LINK.roster.find(x => x.seat === s); return p ? p.name : ''; };
-function rosterOnline(s) { if (!LINK) return false; const p = LINK.roster.find(x => x.seat === s); return !!(p && p.online); }
+function rosterOnline(s) { if (!LINK || s == null) return false; const p = LINK.roster.find(x => x.seat === s); return !!(p && p.online); }
+/* match seat ⇄ link seat */
+const msOf = ls => G && G.map ? G.map.indexOf(ls) : ls;
+const linkOf = ms => G && G.map ? G.map[ms] : ms;
+const isSub = ms => !!(G && G.subs && G.subs[ms]);
 
 /* ---------- lobby ---------- */
 function openOnline(code) {
@@ -2064,145 +2953,185 @@ function openOnline(code) {
   if (code && (!G || G.mode !== 'online')) { netJoin(code); return; }
   renderLobby();
 }
+function defaultCfg(v) { return v === 'hor' ? { threshold: ST.horThr, jokers: ST.horJokers, target: ST.horTarget, aceHigh: ST.horAceHigh, bots: 0 } : { target: ST.target, bonuses: ST.bonuses, bigGin: ST.bigGin }; }
 function netHost() {
-  G = { mode: 'online', net: { role: 'host', seat: 0 }, cfg: { target: ST.target, bonuses: ST.bonuses, bigGin: ST.bigGin }, id: Date.now(), counted: {}, ready: [false, false], hints: 0 };
+  const v = ST.variant === 'hor' ? 'hor' : 'gin';
+  G = { mode: 'online', var: v, net: { role: 'host', seat: 0 }, cfg: defaultCfg(v), id: Date.now(), counted: {}, ready: [], subs: {}, off: {}, bots: {}, hints: 0 };
   saveGame(); LINK.host(); renderLobby();
 }
 function netJoin(code) {
   code = String(code || '').trim().toUpperCase(); if (code.length < 4) { toast(T('codeShort')); return; }
-  G = { mode: 'online', net: { role: 'guest', seat: null }, v: null, id: Date.now(), counted: {}, hints: 0 };
+  G = { mode: 'online', var: 'gin', net: { role: 'guest', seat: null }, v: null, id: Date.now(), counted: {}, subs: {}, bots: {}, hints: 0 };
   saveGame(); LINK.join(code); renderLobby();
 }
 function statusTxt() {
   const st = LINK ? LINK.status : 'off';
   return { off: T('stOff'), connecting: T('stConnecting'), waiting: T('stWaiting'), open: T('stOpen'), reconnecting: T('stRecon'), notfound: T('stNotFound'), error: T('stError'), full: T('stFull') }[st] || st;
 }
+const humansIn = () => (LINK.roster || []).filter(p => p.online).map(p => p.seat).sort((a, b) => a - b);
+const segHTML = (k, opts, cur) => '<div class="seg" data-k="' + k + '">' + opts.map(t => '<button data-v="' + t + '" class="' + (cur === t ? 'on' : '') + '">' + t + '</button>').join('') + '</div>';
+const swHTML = (k, on, a, b) => '<div class="sw ' + (on ? 'on' : '') + '" data-k="' + k + '"><div class="t">' + esc(a) + '<small>' + esc(b) + '</small></div><div class="tg"></div></div>';
 function renderLobby() {
   const b = $('#lobbyBody'); if (!b) return;
   if (!G || G.mode !== 'online') {
-    b.innerHTML = '<div class="card"><h3>' + esc(T('hostTitle')) + '</h3><p class="muted">' + esc(T('hostSub')) + '</p><button class="btn main" id="lHost" style="width:100%">' + esc(T('createRoom')) + '</button></div>' +
+    b.innerHTML = '<div class="card"><h3>' + esc(T('hostTitle')) + '</h3><p class="muted">' + esc(T('hostSub')) + '</p><div class="seg" id="lVar" style="margin-bottom:10px">' + VARIANTS.map(x => '<button data-v="' + x.id + '" class="' + (ST.variant === x.id ? 'on' : '') + '">' + esc(T(x.name)) + '</button>').join('') + '</div><button class="btn main" id="lHost" style="width:100%">' + esc(T('createRoom')) + '</button></div>' +
       '<div class="card"><h3>' + esc(T('joinTitle')) + '</h3><label class="f" for="lCode">' + esc(T('roomCode')) + '</label><input class="in" id="lCode" maxlength="6" autocapitalize="characters" autocomplete="off" style="text-transform:uppercase;letter-spacing:.2em;text-align:center;font-size:22px;direction:ltr"><button class="btn main" id="lJoin" style="width:100%;margin-top:10px">' + esc(T('join')) + '</button></div>' +
       '<div class="card"><label class="f" for="lName">' + esc(T('yourName')) + '</label><input class="in" id="lName" maxlength="20" value="' + esc(ST.name) + '"><p class="muted">' + esc(T('onlineNote')) + '</p></div>';
+    $('#lVar').onclick = e => { const x = e.target.closest('[data-v]'); if (x) { ST.variant = x.dataset.v; saveST(); renderLobby(); } };
     $('#lHost').onclick = () => { saveName(); netHost(); };
     $('#lJoin').onclick = () => { saveName(); netJoin($('#lCode').value); };
     $('#lCode').onkeydown = e => { if (e.key === 'Enter') $('#lJoin').click(); };
     return;
   }
-  const host = !isGuest(), code = LINK.session ? LINK.session.code : '', st = LINK.status;
-  const ros = (LINK.roster || []).map(p => '<div><span class="dot ' + (p.online ? 'on' : '') + '" style="width:10px;height:10px;border-radius:50%;background:' + (p.online ? '#46d07a' : '#888') + '"></span><b>' + esc(p.name || T('player')) + '</b>' + (p.seat === 0 ? ' <span class="muted">· ' + esc(T('hostLbl')) + '</span>' : '') + (p.seat === LINK.seat ? ' <span class="muted">· ' + esc(T('youLbl')) + '</span>' : '') + '</div>').join('');
-  let h = '<div class="card" style="text-align:center"><div class="muted">' + esc(T('roomCode')) + '</div><div class="code">' + esc(code || '·····') + '</div><div class="muted" aria-live="polite">' + esc(statusTxt()) + '</div>';
+  const host = !isGuest(), code = LINK.session ? LINK.session.code : '', hor = G.var === 'hor';
+  const ros = (LINK.roster || []).map(p => '<div><span style="width:10px;height:10px;border-radius:50%;background:' + (p.online ? '#46d07a' : '#888') + '"></span><b>' + esc(p.name || T('player')) + '</b>' + (p.seat === 0 ? ' <span class="muted">· ' + esc(T('hostLbl')) + '</span>' : '') + (p.seat === LINK.seat ? ' <span class="muted">· ' + esc(T('youLbl')) + '</span>' : '') + '</div>').join('');
+  let h = '<div class="card" style="text-align:center"><div class="muted">' + esc(T(hor ? 'hor' : 'gin')) + ' · ' + esc(T('roomCode')) + '</div><div class="code">' + esc(code || '·····') + '</div><div class="muted" aria-live="polite">' + esc(statusTxt()) + '</div>';
   if (host && code) h += '<div class="row" style="margin-top:10px"><button class="btn main" id="lWa">💬 ' + esc(T('inviteWa')) + '</button><button class="btn" id="lCopy">🔗 ' + esc(T('copyLink')) + '</button></div>';
-  h += '</div><div class="card"><h3>' + esc(T('players')) + '</h3><div class="roster">' + (ros || '<div class="muted">' + esc(T('noOneYet')) + '</div>') + '</div></div>';
-  const cfg = G.cfg || (G.v && { target: G.v.target, bonuses: G.v.bonuses, bigGin: G.v.bigGin }) || {};
+  h += '</div><div class="card"><h3>' + esc(T('players')) + '</h3><div class="roster">' + (ros || '<div class="muted">' + esc(T('noOneYet')) + '</div>') + '</div>' + (hor ? '<p class="muted">' + esc(T('upTo4')) + '</p>' : '') + '</div>';
+  const cfg = G.cfg || {}, humans = humansIn().length;
   if (host) {
-    h += '<div class="card"><h3>' + esc(T('gameRules')) + '</h3><label class="f">' + esc(T('target')) + '</label><div class="seg" id="lTarget">' + [50, 100, 150, 250].map(t => '<button data-v="' + t + '" class="' + (cfg.target === t ? 'on' : '') + '">' + t + '</button>').join('') + '</div>' +
-      '<div class="sw ' + (cfg.bonuses ? 'on' : '') + '" data-k="bonuses"><div class="t">' + esc(T('bonuses')) + '<small>' + esc(T('bonusesSub')) + '</small></div><div class="tg"></div></div>' +
-      '<div class="sw ' + (cfg.bigGin ? 'on' : '') + '" data-k="bigGin"><div class="t">' + esc(T('bigGin')) + '<small>' + esc(T('bigGinSub')) + '</small></div><div class="tg"></div></div></div>';
-    const two = (LINK.roster || []).filter(p => p.online).length >= 2;
-    h += G.M ? '<button class="btn main" id="lBack" style="width:100%">' + esc(T('backToGame')) + '</button>' : '<button class="btn main" id="lStart" style="width:100%" ' + (two ? '' : 'disabled') + '>' + esc(two ? T('startGame') : T('waitFriend')) + '</button>';
+    h += '<div class="card"><h3>' + esc(T('gameRules')) + '</h3>';
+    if (hor) {
+      const maxB = Math.max(0, 4 - humans); if (cfg.bots > maxB) cfg.bots = maxB;
+      h += '<label class="f">' + esc(T('addCpus')) + '</label><div class="seg" id="lBots">' + [0, 1, 2, 3].map(n => '<button data-v="' + n + '" class="' + (cfg.bots === n ? 'on' : '') + '" ' + (n > maxB ? 'disabled' : '') + '>' + n + '</button>').join('') + '</div>' +
+        '<label class="f">' + esc(T('openThr')) + '</label>' + segHTML('threshold', [30, 40, 51], cfg.threshold) + '<label class="f">' + esc(T('target')) + '</label>' + segHTML('target', [100, 300, 500], cfg.target) +
+        '<label class="f">' + esc(T('jokers')) + '</label>' + segHTML('jokers', [0, 2, 4], cfg.jokers) + swHTML('aceHigh', cfg.aceHigh, T('aceHigh'), T('aceHighSub')) + '</div>';
+    } else h += '<label class="f">' + esc(T('target')) + '</label>' + segHTML('target', [50, 100, 150, 250], cfg.target) + swHTML('bonuses', cfg.bonuses, T('bonuses'), T('bonusesSub')) + swHTML('bigGin', cfg.bigGin, T('bigGin'), T('bigGinSub')) + '</div>';
+    const enough = hor ? humans + (cfg.bots || 0) >= 2 : humans >= 2;
+    h += G.M ? '<button class="btn main" id="lBack" style="width:100%">' + esc(T('backToGame')) + '</button>' : '<button class="btn main" id="lStart" style="width:100%" ' + (enough ? '' : 'disabled') + '>' + esc(enough ? T('startGame') : T('waitFriend')) + '</button>';
   } else {
-    h += '<div class="card"><h3>' + esc(T('gameRules')) + '</h3><p>' + esc(cfgTxt(cfg)) + '</p><p class="muted">' + esc(G.v ? '' : T('waitHostStart')) + '</p></div>';
+    h += '<div class="card"><h3>' + esc(T('gameRules')) + '</h3><p>' + esc(cfgTxt(cfg, G.var)) + '</p><p class="muted">' + esc(G.v ? '' : (G.spect ? T('gameRunning') : T('waitHostStart'))) + '</p></div>';
     if (G.v) h += '<button class="btn main" id="lBack" style="width:100%">' + esc(T('backToGame')) + '</button>';
   }
   h += '<button class="btn" id="lLeave" style="width:100%;margin-top:10px">🚪 ' + esc(T('leaveRoom')) + '</button>';
   b.innerHTML = h;
   const link = LINK.inviteURL();
-  if ($('#lWa')) $('#lWa').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(T('waText', code) + '\n' + link), '_blank');
+  if ($('#lWa')) $('#lWa').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(T(hor ? 'waTextHor' : 'waText', code) + '\n' + link), '_blank');
   if ($('#lCopy')) $('#lCopy').onclick = async () => { try { await navigator.clipboard.writeText(link); toast(T('copied')); } catch (e) { toast(link, 5000); } };
-  if ($('#lTarget')) $('#lTarget').onclick = e => { const v = e.target.closest('[data-v]'); if (!v) return; G.cfg.target = +v.dataset.v; saveGame(); sendCfg(); renderLobby(); };
+  $$('#lobbyBody .seg[data-k]').forEach(sg => sg.onclick = e => { const v = e.target.closest('[data-v]'); if (!v) return; G.cfg[sg.dataset.k] = +v.dataset.v; saveGame(); sendCfg(); renderLobby(); });
+  if ($('#lBots')) $('#lBots').onclick = e => { const v = e.target.closest('[data-v]'); if (!v || v.disabled) return; G.cfg.bots = +v.dataset.v; saveGame(); sendCfg(); renderLobby(); };
   $$('#lobbyBody .sw[data-k]').forEach(sw => sw.onclick = () => { G.cfg[sw.dataset.k] = !G.cfg[sw.dataset.k]; saveGame(); sendCfg(); renderLobby(); });
   if ($('#lStart')) $('#lStart').onclick = netStart;
   if ($('#lBack')) $('#lBack').onclick = () => show('game');
   $('#lLeave').onclick = netLeave;
 }
-const cfgTxt = c => T('toN', c.target || 100) + ' · ' + (c.bonuses ? T('withBonuses') : T('noBonuses')) + (c.bigGin ? ' · ' + T('bigGin') : '');
-function sendCfg() { if (isHostOnline() && !G.M) LINK.send({ type: 'lobby', cfg: G.cfg }); }
+function cfgTxt(c, v) {
+  if (v === 'hor') return T('hor') + ' · ' + T('openN', c.threshold || 30) + ' · ' + T('toN', c.target || 300) + ' · ' + T('jokersN', c.jokers != null ? c.jokers : 2) + (c.bots ? ' · ' + T('cpusN', c.bots) : '');
+  return T('toN', c.target || 100) + ' · ' + (c.bonuses ? T('withBonuses') : T('noBonuses')) + (c.bigGin ? ' · ' + T('bigGin') : '');
+}
+function sendCfg() { if (isHostOnline() && !G.M) LINK.send({ type: 'lobby', cfg: G.cfg, var: G.var }); }
 function saveName() { const n = $('#lName'); if (n) { ST.name = n.value.trim().slice(0, 20); saveST(); } }
 
 /* ---------- host: run the match ---------- */
 function netStart() {
   if (!isHostOnline()) return;
-  G.M = GIN.newMatch({ target: G.cfg.target, bonuses: G.cfg.bonuses, bigGin: G.cfg.bigGin, names: [ST.name || T('player'), nameAt(1) || T('friend')], dealer: Math.random() < .5 ? 0 : 1 });
-  G.id = Date.now(); G.ready = [false, false]; G.sub = false; G.resSeen = false; NEWC = null; SEL = null;
+  const humans = humansIn(), hor = G.var === 'hor', seats = humans.slice(0, hor ? 4 : 2);
+  const nb = hor ? Math.min(G.cfg.bots || 0, 4 - seats.length) : 0, n = seats.length + nb;
+  G.map = seats.concat(Array(nb).fill(null)); G.bots = {}; for (let i = seats.length; i < n; i++) G.bots[i] = 2;
+  const names = G.map.map((ls, i) => ls == null ? '' : (i === 0 ? ST.name || T('player') : nameAt(ls) || T('friend')));
+  G.M = hor ? HOR.newMatch({ players: n, threshold: G.cfg.threshold, jokers: G.cfg.jokers, target: G.cfg.target, aceHigh: G.cfg.aceHigh, names, dealer: Math.floor(Math.random() * n) })
+    : GIN.newMatch({ target: G.cfg.target, bonuses: G.cfg.bonuses, bigGin: G.cfg.bigGin, names, dealer: Math.random() < .5 ? 0 : 1 });
+  G.id = Date.now(); G.ready = Array(n).fill(false); G.subs = {}; G.off = {}; G.resSeen = false; NEWC = null; SEL = null; SELS = []; STAGE = [];
+  humans.filter(s => !seats.includes(s)).forEach(s => LINK.sendTo(s, { type: 'full' }));   // late arrivals watch the lobby
   show('game'); afterChange(true);
 }
 function netBroadcast() {
-  if (!isHostOnline() || !G.M || !LINK.session) return;
-  if (!LINK.roster.some(p => p.seat === 1)) return;
-  const v = GIN.view(G.M, 1);
-  if (G.M.H.phase === 'end') v.replay = { seed: G.M.H.seed, dealer: G.M.H.dealer, log: G.M.H.log.slice() };   // public once the hand is over
-  LINK.sendTo(1, { type: 'view', v, sub: !!G.sub, ready: G.ready, mid: G.id });
-  // only the newest full view matters — blank older ones (keeps the saved session small, numbering intact)
-  const lk = LINK.session.links && LINK.session.links[1];
-  if (lk && lk.out) { let seen = false; for (let i = lk.out.length - 1; i >= 0; i--) { const d = lk.out[i].d; if (d && d.type === 'view') { if (seen) lk.out[i].d = { type: 'x' }; seen = true; } } }
+  if (!isHostOnline() || !G.M || !LINK.session || !G.map) return;
+  const E = ENG(), R = rnd(G.M);
+  for (let ms = 1; ms < G.map.length; ms++) {
+    const ls = G.map[ms]; if (ls == null || !LINK.roster.some(p => p.seat === ls)) continue;
+    const v = E.view(G.M, ms);
+    if (R.phase === 'end') v.replay = isHor() ? { seed: R.seed, dealer: R.dealer, log: R.log.slice(), n: G.M.n, jokers: G.M.jokers, threshold: G.M.threshold, aceHigh: G.M.aceHigh } : { seed: R.seed, dealer: R.dealer, log: R.log.slice() };
+    LINK.sendTo(ls, { type: 'view', var: G.var, v, subs: G.subs, bots: G.bots, map: G.map, ready: G.ready, mid: G.id });
+    // only the newest full view matters — blank the older ones (session stays small, numbering intact)
+    const lk = LINK.session.links && LINK.session.links[ls];
+    if (lk && lk.out) { let seen = false; for (let i = lk.out.length - 1; i >= 0; i--) { const d = lk.out[i].d; if (d && d.type === 'view') { if (seen) lk.out[i].d = { type: 'x' }; seen = true; } } }
+  }
 }
 function netMsg(m, from) {
   if (!G || G.mode !== 'online' || !m) return;
   if (isHostOnline()) {
-    if (from !== 1) return;
+    const ms = msOf(from); if (ms < 1) return;
     if (m.type === 'act') {
-      if (G.M && !G.sub && GIN.legal(G.M, 1, m.a)) {
-        const top = G.M.H.discard[G.M.H.discard.length - 1];
-        GIN.apply(G.M, 1, m.a);
-        G.last = { s: 1, a: m.a.a, c: m.a.a === 'take' ? top : (m.a.c != null ? m.a.c : null) };
-        if (m.a.a === 'take') fly($('#pDisc'), $('#oHand'), top); else if (m.a.a === 'draw') fly($('#pStock'), $('#oHand'), null, true); else if (m.a.c != null) fly($('#oHand'), $('#pDisc'), m.a.c);
-        beep(m.a.a === 'knock' ? 'knock' : 'card');
+      const E = ENG();
+      if (G.M && !isSub(ms) && E.legal(G.M, ms, m.a)) {
+        const R0 = rnd(G.M), top = R0.discard[R0.discard.length - 1], wasTurn = R0.turn;
+        E.apply(G.M, ms, m.a);
+        G.last = { s: ms, a: m.a.a, c: m.a.a === 'take' ? top : (m.a.c != null ? m.a.c : null) };
+        const oppEl = isHor() ? $('#hOpps [data-seat="' + ms + '"]') : $('#oHand');
+        if (m.a.a === 'take') fly($('#pDisc'), oppEl, top); else if (m.a.a === 'draw') fly($('#pStock'), oppEl, null, true); else if (m.a.a === 'discard' || m.a.a === 'knock') fly(oppEl, $('#pDisc'), m.a.c);
+        beep(m.a.a === 'knock' || m.a.a === 'open' ? 'knock' : 'card');
         afterChange();
-        if (G.M.H.phase !== 'end' && G.M.H.turn === 0) { beep('turn'); buzz(20); }
+        const R = rnd(G.M); if (R.phase !== 'end' && R.turn === 0 && wasTurn !== 0) { beep('turn'); buzz(20); }
       } else netBroadcast();                                   // illegal / stale → resend the truth
-    } else if (m.type === 'ready') { G.ready[1] = true; saveGame(); maybeAdvance(); netBroadcast(); renderReadyLine(); }
+    } else if (m.type === 'ready') { if (G.ready) G.ready[ms] = true; saveGame(); maybeAdvance(); netBroadcast(); renderReadyLine(); }
     else if (m.type === 'hello') netBroadcast();
     return;
   }
   // guest
-  if (m.type === 'lobby') { G.cfg = m.cfg; saveGame(); if (SCREEN === 'lobby') renderLobby(); return; }
+  if (m.type === 'lobby') { G.cfg = m.cfg; G.var = m.var || 'gin'; saveGame(); if (SCREEN === 'lobby') renderLobby(); return; }
+  if (m.type === 'full') { if (!G.v) { G.spect = true; saveGame(); toast(T('gameRunning'), 4000); if (SCREEN === 'lobby') renderLobby(); } return; }
   if (m.type === 'view') {
-    const prev = G.v, v = m.v;
-    if (!prev || prev.handNo !== v.handNo || G.mid !== m.mid) { G.resSeen = false; SEL = null; NEWC = null; closeAllOv(); G.readyMine = false; }
-    else if (v.hand.length > prev.hand.length) NEWC = v.hand.find(c => !prev.hand.includes(c));
+    const prev = G.v, v = m.v; G.var = m.var || 'gin';
+    const newHand = !prev || (prev.handNo || prev.roundNo) !== (v.handNo || v.roundNo) || G.mid !== m.mid;
+    if (newHand) { G.resSeen = false; SEL = null; SELS = []; STAGE = []; NEWC = null; closeAllOv(); G.readyMine = false; }
+    else if (v.hand.length > prev.hand.length && prev.turn === v.seat && prev.phase === 'draw' || (prev.phase === 'first' && v.hand.length > prev.hand.length)) NEWC = v.hand.find(c => !prev.hand.includes(c));
     else if (v.hand.length < prev.hand.length) NEWC = null;
-    if (prev && v.log.length > prev.log.length && v.log[v.log.length - 1][0] !== v.seat) beep(v.log[v.log.length - 1][1] === 'knock' ? 'knock' : 'card');
+    if (prev && v.log.length > prev.log.length && v.log[v.log.length - 1][0] !== v.seat) beep(['knock', 'open'].includes(v.log[v.log.length - 1][1]) ? 'knock' : 'card');
     if (prev && prev.turn !== v.turn && v.turn === v.seat && v.phase !== 'end') { beep('turn'); buzz(20); }
-    G.v = v; G.mid = m.mid; G.sub = m.sub; G.ready = m.ready || [false, false]; BUSY = false;
-    if (!G.ready[1]) G.readyMine = false;
-    if (v.phase === 'end' && !G.counted[G.mid + ':' + v.handNo]) {
-      G.counted[G.mid + ':' + v.handNo] = 1;
-      const res = v.res;
-      if (res.type === 'gin' || res.type === 'biggin') beep('gin'); else if (res.type === 'knock') beep('knock');
-      const R = LS.get('replays', []);
-      // the guest never saw the deck — a replay needs the host's seed + moves, which only become public after the hand
-      if (v.replay) { R.unshift(Object.assign({ d: Date.now(), mode: 'online', names: v.names.slice(), seat: v.seat, bigGin: v.bigGin, type: res.type, winner: res.winner, pts: res.pts || 0, undercut: !!res.undercut }, v.replay)); R.length = Math.min(R.length, 10); LS.set('replays', R); }
-      const gm = { over: v.over, winner: v.winner, final: v.final }; G.id = G.mid;
-      addStats(res, v.seat, gm);
-    }
+    G.v = v; G.mid = m.mid; G.subs = m.subs || {}; G.bots = m.bots || {}; G.map = m.map || null; G.ready = m.ready || []; BUSY = false; G.spect = false;
+    const hk = G.mid + ':' + (v.handNo || v.roundNo);
+    if (v.phase === 'end' && !G.counted[hk]) { G.counted[hk] = 1; guestHandEnd(v); }
     saveGame();
     if (SCREEN === 'lobby') show('game'); else renderGame();
     renderReadyLine();
   }
+}
+function guestHandEnd(v) {
+  const res = v.res, R = LS.get('replays', []);
+  if (v.g === 'hor') {
+    beep(res.winner === v.seat ? 'gin' : 'knock');
+    if (v.replay) { R.unshift(Object.assign({ var: 'hor', d: Date.now(), mode: 'online', names: Array.from({ length: v.n }, (_, i) => horName(v, i)), seat: v.seat, winner: res.winner, pts: res.pts || 0 }, v.replay)); R.length = Math.min(R.length, 10); LS.set('replays', R); }
+    const S = LS.get('stats', {}), b = S.hor_online = S.hor_online || { mp: 0, mw: 0, hp: 0, hw: 0, best: 0 };
+    b.hp++; if (res.winner === v.seat) { b.hw++; b.best = Math.max(b.best, res.pts); }
+    if (v.over && !G.counted['m' + G.mid]) { G.counted['m' + G.mid] = 1; b.mp++; if (v.winner === v.seat) b.mw++; beep(v.winner === v.seat ? 'win' : 'lose'); }
+    LS.set('stats', S); return;
+  }
+  if (res.type === 'gin' || res.type === 'biggin') beep('gin'); else if (res.type === 'knock') beep('knock');
+  if (v.replay) { R.unshift(Object.assign({ d: Date.now(), mode: 'online', names: v.names.slice(), seat: v.seat, bigGin: v.bigGin, type: res.type, winner: res.winner, pts: res.pts || 0, undercut: !!res.undercut }, v.replay)); R.length = Math.min(R.length, 10); LS.set('replays', R); }
+  G.id = G.mid; addStats(res, v.seat, { over: v.over, winner: v.winner, final: v.final });
 }
 /* ready between hands / for a rematch */
 function netReady() {
   if (isHostOnline()) { G.ready[0] = true; saveGame(); maybeAdvance(); netBroadcast(); renderReadyLine(); return; }
   G.readyMine = true; LINK.sendTo(0, { type: 'ready' }); saveGame(); renderReadyLine();
 }
+function waitingFor() {             // friends (online, not replaced by the computer) whose "ready" is still missing
+  if (!G.M || !G.map) return [];
+  const out = []; for (let ms = 1; ms < G.map.length; ms++) if (G.map[ms] != null && !G.ready[ms] && rosterOnline(G.map[ms]) && !isSub(ms)) out.push(ms);
+  return out;
+}
 function maybeAdvance(force) {
-  if (!isHostOnline() || !G.M || G.M.H.phase !== 'end') return;
-  const friendIn = rosterOnline(1) && !G.sub;
-  if (!G.ready[0] || (!G.ready[1] && friendIn && !force)) return;
-  G.ready = [false, false]; G.resSeen = false; NEWC = null; SEL = null; closeAllOv();
+  if (!isHostOnline() || !G.M || rnd(G.M).phase !== 'end') return;
+  if (!G.ready[0] || (waitingFor().length && !force)) return;
+  G.ready = G.ready.map(() => false); G.resSeen = false; NEWC = null; SEL = null; SELS = []; STAGE = []; closeAllOv();
   if (G.M.over) {
-    const M0 = G.M; G.M = GIN.newMatch({ target: M0.target, bonuses: M0.bonuses, bigGin: M0.bigGin, names: [ST.name || T('player'), nameAt(1) || M0.names[1]], dealer: 1 - M0.H.dealer });
+    const M0 = G.M, names = G.map.map((ls, i) => ls == null ? '' : (i === 0 ? ST.name || T('player') : nameAt(ls) || M0.names[i]));
+    G.M = isHor() ? HOR.newMatch({ players: M0.n, threshold: M0.threshold, jokers: M0.jokers, target: M0.target, aceHigh: M0.aceHigh, names, dealer: (M0.R.dealer + 1) % M0.n })
+      : GIN.newMatch({ target: M0.target, bonuses: M0.bonuses, bigGin: M0.bigGin, names, dealer: 1 - M0.H.dealer });
     G.id = Date.now(); G.hints = 0;
-  } else GIN.nextHand(G.M);
+  } else if (isHor()) HOR.nextRound(G.M); else GIN.nextHand(G.M);
   afterChange(true);
 }
 function renderReadyLine() {
   const el = $('#readyLine'); if (!el || !G || G.mode !== 'online') return;
   const v = curView(); if (!v) return;
-  const me = v.seat, o = 1 - me, r = G.ready || [false, false];
-  const mine = isGuest() ? (G.readyMine || r[1]) : r[0], theirs = isGuest() ? r[0] : r[1];
-  let t = (mine ? '✓ ' + T('youReady') : '') + (mine && !theirs ? ' · ' : '') + (theirs ? ' ✓ ' + T('xReady', nameOf(v, o)) : (mine ? T('waitingX', nameOf(v, o)) : ''));
-  el.innerHTML = esc(t) + (isHostOnline() && mine && !theirs && !rosterOnline(1) ? ' <button class="btn" id="goNoWait" style="min-height:40px;margin-top:6px">' + esc(T('startNoWait')) + '</button>' : '');
+  const r = G.ready || [], me = v.seat, mine = isGuest() ? (G.readyMine || r[me]) : r[0];
+  const n = v.n || 2, others = Array.from({ length: n }, (_, i) => i).filter(i => i !== me && !(G.bots && G.bots[i] != null) && !isSub(i));
+  const waiting = others.filter(i => !r[i]), names = waiting.map(i => nameOf(v, i)).join(', ');
+  const t = mine ? '✓ ' + T('youReady') + (waiting.length ? ' · ' + T('waitingX', names) : '') : others.filter(i => r[i]).map(i => '✓ ' + T('xReady', nameOf(v, i))).join(' · ');
+  const stuck = isHostOnline() && mine && waiting.length && waiting.every(i => !rosterOnline(linkOf(i)));
+  el.innerHTML = esc(t) + (stuck ? ' <button class="btn" id="goNoWait" style="min-height:40px;margin-top:6px">' + esc(T('startNoWait')) + '</button>' : '');
   const gw = $('#goNoWait'); if (gw) gw.onclick = () => maybeAdvance(true);
   $$('#ovs [data-n],#ovs [data-r]').forEach(b => { if (mine) { b.disabled = true; b.textContent = '✓ ' + T('ready'); } });
 }
@@ -2210,13 +3139,17 @@ function renderReadyLine() {
 function subWatch() {
   clearInterval(subT);
   subT = setInterval(() => {
-    if (!isHostOnline() || !G.M || G.M.over) return;
-    if (rosterOnline(1)) { G.offSince = null; return; }
-    if (!LINK.roster.some(p => p.seat === 1)) return;
-    G.offSince = G.offSince || Date.now();
-    if (!G.sub && Date.now() - G.offSince > 30000) { G.sub = true; saveGame(); toast(T('cpuStandIn', G.M.names[1]), 4500); renderGame(); scheduleAI(); }
-    if (G.sub && G.M.H.phase === 'end' && G.ready[0]) maybeAdvance(true);
-    if (G.sub) scheduleAI();
+    if (!isHostOnline() || !G.M || G.M.over || !G.map) return;
+    let changed = false;
+    for (let ms = 1; ms < G.map.length; ms++) {
+      const ls = G.map[ms]; if (ls == null) continue;
+      if (rosterOnline(ls)) { G.off[ms] = null; continue; }
+      G.off[ms] = G.off[ms] || Date.now();
+      if (!G.subs[ms] && Date.now() - G.off[ms] > 30000) { G.subs[ms] = true; changed = true; toast(T('cpuStandIn', G.M.names[ms] || T('friend')), 4500); }
+    }
+    if (changed) { saveGame(); netBroadcast(); renderGame(); }
+    if (rnd(G.M).phase === 'end' && G.ready[0] && !waitingFor().length) maybeAdvance();
+    if (Object.values(G.subs).some(Boolean)) scheduleAI();
   }, 2000);
 }
 function netAct(a) { LINK.sendTo(0, { type: 'act', a }); }
@@ -2236,32 +3169,36 @@ function renderNet() {
 }
 
 /* ---------- voice, emoji, quick messages ---------- */
-function bubble(seat, text, cls) {
+function anchorFor(ms) {
+  const v = curView(); if (!v) return null;
+  if (ms === v.seat) return $('#hand');
+  return isHor() ? ($('#hOpps [data-seat="' + ms + '"]') || $('#hOpps')) : $('#opp');
+}
+function bubble(ms, text, cls) {
   const L = $('#bubbles'); if (!L || SCREEN !== 'game') return;
-  const v = curView(); const mine = v && seat === v.seat;
-  const anchor = mine ? $('#hand') : $('#opp'); if (!anchor) return;
+  const v = curView(), mine = v && ms === v.seat, anchor = anchorFor(ms); if (!anchor) return;
   const r = anchor.getBoundingClientRect(), single = /^\p{Extended_Pictographic}(\uFE0F|\u200D\p{Extended_Pictographic})*$/u.test(text);
   const b = document.createElement('div'); b.className = 'bub ' + (single ? 'emo ' : '') + (cls || '');
-  b.innerHTML = single ? esc(text) : '<small>' + esc(v ? nameOf(v, seat) : '') + '</small>' + esc(text);
+  b.innerHTML = single ? esc(text) : '<small>' + esc(v && ms >= 0 ? nameOf(v, ms) : '') + '</small>' + esc(text);
   L.appendChild(b);
   const bw = b.offsetWidth, x = Math.max(8, Math.min(innerWidth - bw - 8, r.left + r.width / 2 - bw / 2));
   b.style.left = x + 'px'; b.style.top = Math.max(8, mine ? r.top - b.offsetHeight - 6 : r.bottom + 4) + 'px';
   setTimeout(() => b.remove(), single ? 3500 : 6000);
 }
-function sendEmo(e) { if (!LINK) return; LINK.emoji(e); bubble(LINK.seat, e); }
+function sendEmo(e) { if (!LINK) return; LINK.emoji(e); const v = curView(); bubble(v ? v.seat : 0, e); }
 function emoPanel() {
   const E = ['👍', '😂', '😮', '😅', '🔥', '👏', '😬', '🙈'], PH = ['phNice', 'phHurry', 'phLucky', 'phOops', 'phAgain', 'phGG'];
   const o = overlay('<div class="emogrid">' + E.map(e => '<button data-e="' + e + '">' + e + '</button>').join('') + '</div><div class="phr">' + PH.map(k => '<button data-e="' + esc(T(k)) + '">' + esc(T(k)) + '</button>').join('') + '</div><div class="row" style="margin-top:10px"><button class="btn" data-c>' + esc(T('close')) + '</button></div>');
   o.addEventListener('click', e => { const b = e.target.closest('[data-e]'); if (b) { sendEmo(b.dataset.e); closeOv(o); } else if (e.target.closest('[data-c]')) closeOv(o); });
 }
-function voiceMsg(url, sec, seat, mine) {
+function voiceMsg(url, sec, ms, mine) {
   const L = $('#bubbles'); const v = curView(); if (!L) return;
   const a = new Audio(url); if (!mine) { const p = a.play(); if (p && p.catch) p.catch(() => toast(T('tapToHear'))); }
-  const anchor = v && seat === v.seat ? $('#hand') : $('#opp'); if (!anchor) return;
+  const anchor = mine ? $('#hand') : anchorFor(ms); if (!anchor) return;
   const r = anchor.getBoundingClientRect(), b = document.createElement('div'); b.className = 'bub'; b.style.pointerEvents = 'auto';
-  b.innerHTML = '<small>' + esc(v ? nameOf(v, seat) : '') + '</small><span class="vmsg"><button class="btn" style="min-height:36px;padding:4px 10px">▶</button> 🎤 ' + iso(sec.toFixed(1) + 's') + '</span>';
+  b.innerHTML = '<small>' + esc(v && ms >= 0 ? nameOf(v, ms) : '') + '</small><span class="vmsg"><button class="btn" style="min-height:36px;padding:4px 10px">▶</button> 🎤 ' + iso(sec.toFixed(1) + 's') + '</span>';
   b.querySelector('button').onclick = () => { a.currentTime = 0; a.play(); };
-  L.appendChild(b); b.style.left = Math.max(8, Math.min(innerWidth - b.offsetWidth - 8, r.left + 10)) + 'px'; b.style.top = (seat === (v && v.seat) ? r.top - b.offsetHeight - 6 : r.bottom + 4) + 'px';
+  L.appendChild(b); b.style.left = Math.max(8, Math.min(innerWidth - b.offsetWidth - 8, r.left + 10)) + 'px'; b.style.top = (mine ? r.top - b.offsetHeight - 6 : r.bottom + 4) + 'px';
   setTimeout(() => b.remove(), 15000);
 }
 function bindVoice() {
@@ -2280,7 +3217,7 @@ function bindVoice() {
    ===================================================================== */
 let RULES_BACK = 'home';
 /* the rummy family — only variants whose engine is finished are listed */
-const VARIANTS = [{ id: 'gin', name: 'gin', sub: 'ginSub' }];
+const VARIANTS = [{ id: 'gin', name: 'gin', sub: 'ginSub' }, { id: 'hor', name: 'hor', sub: 'horSub' }];
 
 function renderHome() {
   applyLang();
@@ -2291,7 +3228,7 @@ function renderHome() {
   const c = $('#mCont'), g = G;
   if (g && ((g.M && !g.M.over) || g.mode === 'online')) {
     c.classList.remove('hide');
-    $('#mContSub').textContent = g.mode === 'online' ? T('online') + (LINK && LINK.session ? ' · ' + LINK.session.code : '') : g.mode === 'two' ? T('twoPhone') : T('vsCpu') + ' · ' + T(LVL[g.level]);
+    $('#mContSub').textContent = (g.var === 'hor' ? T('hor') : T('gin')) + ' · ' + (g.mode === 'online' ? T('online') + (LINK && LINK.session ? ' · ' + LINK.session.code : '') : g.mode === 'two' ? T('twoPhone') : T('vsCpu') + ' · ' + T(LVL[g.level]));
   } else c.classList.add('hide');
 }
 function chooseLevel() {
@@ -2323,6 +3260,9 @@ function renderSettings() {
     sw('oneTap', T('oneTap'), T('oneTapSub')) + sw('memory', T('memoryAid'), T('memoryAidSub')) + sw('sound', T('sound')) + sw('vib', T('vibration')) + '</div>' +
     '<div class="card"><h3>' + esc(T('gameRules')) + '</h3><p class="muted">' + esc(T('rulesForNew')) + '</p><label class="f">' + esc(T('target')) + '</label>' + seg('target', [[50, '50'], [100, '100'], [150, '150'], [250, '250']]) +
     sw('bonuses', T('bonuses'), T('bonusesSub')) + sw('bigGin', T('bigGin'), T('bigGinSub')) + '</div>' +
+    '<div class="card"><h3>' + esc(T('hor')) + '</h3><p class="muted">' + esc(T('rulesForNew')) + '</p><label class="f">' + esc(T('openThr')) + '</label>' + seg('horThr', [[30, '30'], [40, '40'], [51, '51']]) +
+    '<label class="f">' + esc(T('jokers')) + '</label>' + seg('horJokers', [[0, '0'], [2, '2'], [4, '4']]) + '<label class="f">' + esc(T('target')) + '</label>' + seg('horTarget', [[100, '100'], [300, '300'], [500, '500']]) +
+    sw('horAceHigh', T('aceHigh'), T('aceHighSub')) + '</div>' +
     '<div class="card"><h3>' + esc(T('data')) + '</h3><div class="row"><button class="btn" id="sBackup">⬇️ ' + esc(T('backup')) + '</button><label class="btn" for="sRestore">⬆️ ' + esc(T('restore')) + '</label><input type="file" id="sRestore" accept="application/json,.json" class="hide"></div><p class="muted">' + esc(T('dataNote')) + '</p>' +
     '<div class="row"><button class="btn ghosty" id="sTour">🧭 ' + esc(T('tourAgain')) + '</button><button class="btn ghosty" id="sReset" style="color:var(--bad);border-color:var(--bad)">🗑️ ' + esc(T('deleteAll')) + '</button></div></div>' +
     '<div class="badge">RummyNest v' + APP_VERSION + ' · © AppNest 2026</div>';
@@ -2339,7 +3279,7 @@ function renderSettings() {
 
 /* ---------- stats ---------- */
 function renderStats() {
-  const S = LS.get('stats', {}), rows = [['cpu0', T('vsCpu') + ' · ' + T('lvEasy')], ['cpu1', T('vsCpu') + ' · ' + T('lvMed')], ['cpu2', T('vsCpu') + ' · ' + T('lvHard')], ['cpu3', T('vsCpu') + ' · ' + T('lvExpert')], ['online', T('online')], ['two', T('twoPhone')]];
+  const S = LS.get('stats', {}), rows = [['hor_cpu0', T('hor') + ' · ' + T('lvEasy')], ['hor_cpu1', T('hor') + ' · ' + T('lvMed')], ['hor_cpu2', T('hor') + ' · ' + T('lvHard')], ['hor_cpu3', T('hor') + ' · ' + T('lvExpert')], ['hor_online', T('hor') + ' · ' + T('online')], ['hor_two', T('hor') + ' · ' + T('twoPhone')], ['cpu0', T('vsCpu') + ' · ' + T('lvEasy')], ['cpu1', T('vsCpu') + ' · ' + T('lvMed')], ['cpu2', T('vsCpu') + ' · ' + T('lvHard')], ['cpu3', T('vsCpu') + ' · ' + T('lvExpert')], ['online', T('online')], ['two', T('twoPhone')]];
   let h = '';
   for (const [k, lab] of rows) {
     const b = S[k]; if (!b || !b.hp) continue;
@@ -2348,9 +3288,9 @@ function renderStats() {
       (k === 'two' ? '<tr><td>' + esc(T('matchesPlayed')) + '</td><td>' + b.mp + '</td></tr><tr><td>' + esc(T('handsPlayed')) + '</td><td>' + b.hp + '</td></tr>' :
         '<tr><td>' + esc(T('matches')) + '</td><td>' + iso(b.mw + ' / ' + b.mp) + '</td><td>' + pct(b.mw, b.mp) + '</td></tr>' +
         '<tr><td>' + esc(T('handsWon')) + '</td><td>' + iso(b.hw + ' / ' + b.hp) + '</td><td>' + pct(b.hw, b.hp) + '</td></tr>' +
-        '<tr><td>' + esc(T('gins')) + '</td><td>' + b.gin + '</td><td></td></tr><tr><td>' + esc(T('knocks')) + '</td><td>' + b.knock + '</td><td></td></tr>' +
-        '<tr><td>' + esc(T('undercutsFor')) + '</td><td>' + b.uFor + '</td><td></td></tr><tr><td>' + esc(T('undercutsAg')) + '</td><td>' + b.uAg + '</td><td></td></tr>' +
-        (b.best ? '<tr><td>' + esc(T('bestWin')) + '</td><td>+' + b.best + '</td><td></td></tr>' : '')) + '</table></div>';
+        (k.startsWith('hor') ? '' : '<tr><td>' + esc(T('knocks')) + '</td><td>' + b.knock + '</td><td></td></tr>' +
+        '<tr><td>' + esc(T('undercutsFor')) + '</td><td>' + b.uFor + '</td><td></td></tr><tr><td>' + esc(T('undercutsAg')) + '</td><td>' + b.uAg + '</td><td></td></tr>') +
+        (k.startsWith('hor') ? '' : '<tr><td>' + esc(T('gins')) + '</td><td>' + b.gin + '</td><td></td></tr>') + (b.best ? '<tr><td>' + esc(T('bestWin')) + '</td><td>+' + b.best + '</td><td></td></tr>' : '')) + '</table></div>';
   }
   $('#statBody').innerHTML = h || '<div class="card"><p>' + esc(T('noStats')) + '</p><button class="btn main" id="stPlay" style="width:100%">' + esc(T('vsCpu')) + '</button></div>';
   if ($('#stPlay')) $('#stPlay').onclick = chooseLevel;
@@ -2360,10 +3300,11 @@ function renderStats() {
 function renderReplays() {
   const R = LS.get('replays', []);
   if (!R.length) { $('#repBody').innerHTML = '<div class="card"><p>' + esc(T('noReplays')) + '</p></div>'; return; }
-  $('#repBody').innerHTML = R.map((r, i) => '<button class="card" data-i="' + i + '" style="width:100%;text-align:start;cursor:pointer;display:block"><b>' + esc(r.names.join(' – ')) + '</b><div class="muted">' + esc(new Date(r.d).toLocaleString(ST.lang)) + ' · ' + esc(r.type === 'draw' ? T('rDraw') : T('winsX', r.names[r.winner]) + ' +' + r.pts) + '</div></button>').join('');
+  $('#repBody').innerHTML = R.map((r, i) => '<button class="card" data-i="' + i + '" style="width:100%;text-align:start;cursor:pointer;display:block"><b>' + esc(r.names.join(' – ')) + '</b><div class="muted">' + esc(new Date(r.d).toLocaleString(ST.lang)) + ' · ' + esc((r.var === 'hor' ? T('hor') + ' · ' : '') + (r.type === 'draw' || r.winner == null ? T('rDraw') : T('winsX', r.names[r.winner]) + ' +' + r.pts)) + '</div></button>').join('');
   $$('#repBody [data-i]').forEach(b => b.onclick = () => playReplay(R[+b.dataset.i]));
 }
 function playReplay(r) {
+  if (r.var === 'hor') return horReplay(r);
   const M = GIN.newMatch({ seed: r.seed, dealer: r.dealer, bigGin: r.bigGin, names: r.names, target: 9999 });
   const frames = [JSON.parse(JSON.stringify(M.H))];
   for (const [s, a, c] of r.log) {
@@ -2392,7 +3333,8 @@ function playReplay(r) {
 
 /* ---------- rules ---------- */
 function renderRules() {
-  $('#rulesBody').innerHTML = T('rulesHtml').replace(/\{knock\}/g, GIN.KNOCK);
+  const gin = '<h2>' + esc(T('gin')) + '</h2>' + T('rulesHtml').replace(/\{knock\}/g, GIN.KNOCK), hor = T('rulesHorHtml').replace(/\{thr\}/g, ST.horThr);
+  $('#rulesBody').innerHTML = ST.variant === 'hor' ? hor + gin : gin + hor;
 }
 
 /* ---------- about ---------- */
@@ -2425,7 +3367,7 @@ function tour(force) {
 
 /* ---------- init ---------- */
 function init() {
-  applyLook(); applyLang(); initLink(); bindGame(); bindVoice(); subWatch();
+  applyLook(); applyLang(); initLink(); bindGame(); bindHor(); bindVoice(); subWatch();
   $$('[data-home]').forEach(b => b.onclick = () => { if (b.closest('#rules') && RULES_BACK !== 'home') { const t = RULES_BACK; RULES_BACK = 'home'; show(t); return; } if (b.closest('#lobby') && G && G.mode === 'online' && !G.M && !G.v) { netLeave(); return; } show('home'); renderHome(); });
   $('#hTheme').onclick = () => { ST.theme = THEMES[(THEMES.indexOf(ST.theme) + 1) % THEMES.length]; saveST(); applyLook(); toast('🎨 ' + T('theme')); };
   $('#hMode').onclick = () => { ST.mode = ST.mode === 'day' ? 'night' : 'day'; saveST(); applyLook(); };
@@ -2436,8 +3378,8 @@ function init() {
   $('#hReplays').onclick = () => { renderReplays(); show('replays'); };
   $('#hSettings').onclick = () => { renderSettings(); show('settings'); };
   $('#vgrid').onclick = e => { const b = e.target.closest('[data-v]'); if (b) { ST.variant = b.dataset.v; saveST(); renderHome(); } };
-  $('#mCpu').onclick = chooseLevel;
-  $('#mTwo').onclick = askTwo;
+  $('#mCpu').onclick = () => ST.variant === 'hor' ? horSetup('cpu') : chooseLevel();
+  $('#mTwo').onclick = () => ST.variant === 'hor' ? horSetup('two') : askTwo();
   $('#mOnline').onclick = () => { if (G && G.mode === 'online') { show(G.M || G.v ? 'game' : 'lobby'); if (!G.M && !G.v) renderLobby(); } else openOnline(); };
   $('#mCont').onclick = () => {
     if (!G) return;
