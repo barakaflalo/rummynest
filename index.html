@@ -1166,12 +1166,12 @@ const HOR = (() => {
       case 'take': return R.phase === 'draw' && R.discard.length > 0;
       case 'open': {
         if (R.phase !== 'play' || R.opened[s] || !Array.isArray(a.melds) || !a.melds.length) return false;
-        const all = [].concat(...a.melds); if (!has(hand, all) || hand.length - all.length < 1) return false;
+        const all = [].concat(...a.melds); if (!has(hand, all)) return false;
         let v = 0; for (const m of a.melds) { const vm = validMeld(m, M.aceHigh); if (!vm) return false; v += vm.value; }
         return v >= M.threshold;
       }
-      case 'meld': return R.phase === 'play' && R.opened[s] && has(hand, a.cards || []) && hand.length - a.cards.length >= 1 && !!validMeld(a.cards, M.aceHigh);
-      case 'lay': return R.phase === 'play' && R.opened[s] && hand.includes(a.c) && hand.length >= 2 && R.table[a.m] && !!fitLay(R.table[a.m], a.c, M.aceHigh);
+      case 'meld': return R.phase === 'play' && R.opened[s] && has(hand, a.cards || []) && !!validMeld(a.cards, M.aceHigh);
+      case 'lay': return R.phase === 'play' && R.opened[s] && hand.includes(a.c) && R.table[a.m] && !!fitLay(R.table[a.m], a.c, M.aceHigh);
       case 'swap': {
         if (R.phase !== 'play' || !R.opened[s] || !hand.includes(a.c) || !R.table[a.m]) return false;
         const j = swapFit(R.table[a.m], a.c); return j != null;
@@ -1214,7 +1214,8 @@ const HOR = (() => {
       if (!hand.length) endRound(M, s);
       else { R.turn = (s + 1) % M.n; R.phase = 'draw'; }
     }
-    // the meld that was just changed: keep the moved card visible to the UI
+    // going out without a discard: the last cards were laid down
+    if (R.phase === 'play' && !hand.length) { R.log.push([s, 'out']); endRound(M, s); }
     return true;
   }
   function endRound(M, w) {
@@ -1318,10 +1319,7 @@ const HOR = (() => {
     if (!v.opened[s]) {
       const o = plan(hand, v.aceHigh, 'open');
       if (o.v >= v.threshold) {
-        let melds = o.melds.slice(), left = hand.length - [].concat(...melds).length;
-        while (left < 1 && melds.length > 1) { melds.sort((a, b) => validMeld(a, v.aceHigh).value - validMeld(b, v.aceHigh).value); const m = melds.shift(); left += m.length; }
-        const tot = melds.reduce((t, m) => t + validMeld(m, v.aceHigh).value, 0);
-        if (tot >= v.threshold && left >= 1) return { a: 'open', melds };
+        return { a: 'open', melds: o.melds.slice() };
       }
     } else {
       // 2) swap a joker off the table when I hold the real card (and can use the joker)
@@ -1334,7 +1332,7 @@ const HOR = (() => {
       }
       // 3) new melds from the hand (keep one card to throw)
       const p = plan(hand, v.aceHigh, 'dw');
-      for (const m of p.melds) if (hand.length - m.length >= 1) {
+      for (const m of p.melds) {
         if (L.keepJ && m.some(isJ) && !m.some(c => v.must.includes(c)) && hand.length > 4 && m.filter(c => !isJ(c)).length >= 3) {
           const nat = m.filter(c => !isJ(c)); if (validMeld(nat, v.aceHigh)) return { a: 'meld', cards: nat };
         }
@@ -1343,7 +1341,6 @@ const HOR = (() => {
       // 4) lay off loose cards (jokers I must use first)
       const must = v.must.filter(c => hand.includes(c)), order = must.concat(p.loose.filter(c => !must.includes(c)));
       for (const c of order) {
-        if (hand.length < 2) break;
         if (isJ(c) && !must.includes(c) && L.keepJ && hand.length > 3) continue;
         if (!must.includes(c) && rnd() > L.layP) continue;
         for (let mi = 0; mi < v.table.length; mi++) if (fitLay(v.table[mi], c, v.aceHigh)) return { a: 'lay', c, m: mi };
@@ -1796,6 +1793,7 @@ rulesHtml:"<h3>الهدف</h3><p>لاعبان. رتّب أوراقك العشر 
 
 /* ---- i18n/hor_he.js ---- */
 Object.assign(LANG.he, {
+goOut:"הורד הכל וסיים! 🏁",
 upTo4:"עד 4 שחקנים בחדר. אפשר להשלים מקומות במחשבים.",
 addCpus:"להוסיף מחשבים",
 gameRunning:"המשחק כבר התחיל — תיכנס למשחק הבא",
@@ -1813,11 +1811,12 @@ hOpen:"יש לך הורדה של {0} — סימנתי אותה, לחץ הורד"
 rNoWinner:"הקופה נגמרה — אין מנצח בסיבוב", youOut:"סיימת!", xOut:"{0} סיים!", leftInHand:"נשאר ביד", roundsWon:"{0} סיבובים",
 expertTwoOnly:"במשחק של 3–4 שחקנים יש עד רמה קשה: במדידות, למומחה לא היה שם יתרון אמיתי.", levelNoteHor:"כל רמה נמדדה מול הרמה שמתחתיה במאות משחקים.",
 jokersN:"{0} ג'וקרים", joker:"ג'וקר", openThr:"הורדה ראשונה", jokers:"ג'וקרים", aceHigh:"אס גם אחרי המלך", aceHighSub:"Q-K-A מותר (K-A-2 אף פעם לא)",
-rulesHorHtml:"<h2>רמי הורדות</h2><h3>הכנה</h3><p>2–4 שחקנים, שתי חפיסות וג'וקרים (לפי ההגדרות). כל אחד מקבל 14 קלפים, וקלף אחד נפתח לערימה.</p><h3>תור</h3><p>לוקחים קלף — מהקופה או מראש הערימה — ובסוף התור זורקים קלף. אסור לזרוק בחזרה את הקלף שלקחת עכשיו מהערימה.</p><h3>הורדה ראשונה</h3><p>בפעם הראשונה מורידים מהיד סדרות ששוות יחד <b>{thr} לפחות</b>. ערכים: 2–10 לפי המספר, J Q K שווים 10, אס 1 ב-A-2-3 ו-11 ב-Q-K-A או בסט. ג'וקר שווה את הקלף שהוא מחליף.</p><h3>אחרי ההורדה</h3><ul><li>מורידים סדרות חדשות.</li><li>מוסיפים קלפים לכל סדרה על השולחן — גם של אחרים: בוחרים קלף ומקישים על הסדרה.</li><li>מי שמחזיק את הקלף שג'וקר מחליף יכול לקחת את הג'וקר — וחייב לשבץ אותו באותו תור.</li></ul><h3>סדרות</h3><p>סט: 3–4 קלפים מאותו מספר בצורות שונות. רצף: 3 ומעלה ברצף מאותה צורה. בכל סדרה לפחות שני קלפים אמיתיים.</p><h3>סיום</h3><p>מנצח מי שזורק את הקלף האחרון שלו (צריך תמיד להשאיר קלף לזריקה). הוא מקבל את סכום הקלפים שנשארו אצל כל השאר; ג'וקר ביד שווה 30. אם הקופה נגמרת — מערבבים את הערימה פעם אחת; אם נגמרת שוב, הסיבוב בלי מנצח. מי שמגיע ראשון ליעד מנצח במשחק.</p>"
+rulesHorHtml:"<h2>רמי הורדות</h2><h3>הכנה</h3><p>2–4 שחקנים, שתי חפיסות וג'וקרים (לפי ההגדרות). כל אחד מקבל 14 קלפים, וקלף אחד נפתח לערימה.</p><h3>תור</h3><p>לוקחים קלף — מהקופה או מראש הערימה — ובסוף התור זורקים קלף. אסור לזרוק בחזרה את הקלף שלקחת עכשיו מהערימה.</p><h3>הורדה ראשונה</h3><p>בפעם הראשונה מורידים מהיד סדרות ששוות יחד <b>{thr} לפחות</b>. ערכים: 2–10 לפי המספר, J Q K שווים 10, אס 1 ב-A-2-3 ו-11 ב-Q-K-A או בסט. ג'וקר שווה את הקלף שהוא מחליף.</p><h3>אחרי ההורדה</h3><ul><li>מורידים סדרות חדשות.</li><li>מוסיפים קלפים לכל סדרה על השולחן — גם של אחרים: בוחרים קלף ומקישים על הסדרה.</li><li>מי שמחזיק את הקלף שג'וקר מחליף יכול לקחת את הג'וקר — וחייב לשבץ אותו באותו תור.</li></ul><h3>סדרות</h3><p>סט: 3–4 קלפים מאותו מספר בצורות שונות. רצף: 3 ומעלה ברצף מאותה צורה. בכל סדרה לפחות שני קלפים אמיתיים.</p><h3>סיום</h3><p>מנצח מי שנשאר בלי קלפים — בזריקת הקלף האחרון, או בהורדה של כל הקלפים שנשארו. הוא מקבל את סכום הקלפים שנשארו אצל כל השאר; ג'וקר ביד שווה 30. אם הקופה נגמרת — מערבבים את הערימה פעם אחת; אם נגמרת שוב, הסיבוב בלי מנצח. מי שמגיע ראשון ליעד מנצח במשחק.</p>"
 });
 
 /* ---- i18n/hor_en.js ---- */
 Object.assign(LANG.en, {
+goOut:"Lay down all and win! 🏁",
 upTo4:"Up to 4 players. Empty seats can be filled with computers.",
 addCpus:"Add computers",
 gameRunning:"The game has already started — you'll join the next one",
@@ -1835,11 +1834,12 @@ hOpen:"You have an opening of {0} — I marked it, tap Open", hMeld:"Lay down th
 rNoWinner:"The stock ran out — no winner this round", youOut:"You're out!", xOut:"{0} is out!", leftInHand:"Left in hand", roundsWon:"{0} rounds",
 expertTwoOnly:"With 3–4 players the top level is Hard: in testing the expert had no real edge there.", levelNoteHor:"Each level was measured against the one below over hundreds of matches.",
 jokersN:"{0} jokers", joker:"Joker", openThr:"First meld", jokers:"Jokers", aceHigh:"Ace also above the king", aceHighSub:"Q-K-A allowed (K-A-2 never)",
-rulesHorHtml:"<h2>Rummy with a first meld</h2><h3>Setup</h3><p>2–4 players, two decks and jokers (see settings). 14 cards each; one card starts the discard pile.</p><h3>A turn</h3><p>Draw one card — from the stock or the top of the pile — and end by throwing one card. You can't throw back the card you just took from the pile.</p><h3>First meld</h3><p>The first time, lay down melds from your hand worth <b>{thr} or more</b> together. Values: 2–10 face value, J Q K 10, ace 1 in A-2-3 and 11 in Q-K-A or a set. A joker is worth the card it stands for.</p><h3>After opening</h3><ul><li>Lay down new melds.</li><li>Add cards to any meld on the table — anyone's: pick a card and tap the meld.</li><li>Holding the card a joker stands for lets you take that joker — and you must use it the same turn.</li></ul><h3>Melds</h3><p>Set: 3–4 of a rank in different suits. Run: 3+ in a row, same suit. Every meld needs at least two real cards.</p><h3>Ending</h3><p>Whoever throws their last card wins the round (always keep one card to throw) and scores everyone else's cards; a joker in hand counts 30. If the stock runs out the pile is reshuffled once; if it runs out again the round has no winner. First to the target wins the match.</p>"
+rulesHorHtml:"<h2>Rummy with a first meld</h2><h3>Setup</h3><p>2–4 players, two decks and jokers (see settings). 14 cards each; one card starts the discard pile.</p><h3>A turn</h3><p>Draw one card — from the stock or the top of the pile — and end by throwing one card. You can't throw back the card you just took from the pile.</p><h3>First meld</h3><p>The first time, lay down melds from your hand worth <b>{thr} or more</b> together. Values: 2–10 face value, J Q K 10, ace 1 in A-2-3 and 11 in Q-K-A or a set. A joker is worth the card it stands for.</p><h3>After opening</h3><ul><li>Lay down new melds.</li><li>Add cards to any meld on the table — anyone's: pick a card and tap the meld.</li><li>Holding the card a joker stands for lets you take that joker — and you must use it the same turn.</li></ul><h3>Melds</h3><p>Set: 3–4 of a rank in different suits. Run: 3+ in a row, same suit. Every meld needs at least two real cards.</p><h3>Ending</h3><p>Whoever runs out of cards wins the round — by throwing the last card or by laying down all the cards left — and scores everyone else's cards; a joker in hand counts 30. If the stock runs out the pile is reshuffled once; if it runs out again the round has no winner. First to the target wins the match.</p>"
 });
 
 /* ---- i18n/hor_ru.js ---- */
 Object.assign(LANG.ru, {
+goOut:"Выложить всё и выйти! 🏁",
 upTo4:"До 4 игроков. Свободные места можно занять компьютерами.", addCpus:"Добавить компьютеры", gameRunning:"Игра уже идёт — вы войдёте в следующую", waTextHor:"Сыграем в рамми в RummyNest! Код комнаты: {0}", cpusN:"компьютеров: {0}", handPts:"Очки в руке",
 hor:"Рамми (выкладка 30)", horSub:"2–4 игрока · 14 карт · первая выкладка 30",
 roundN:"раунд {0}", openN:"выкладка {0}", openedS:"выложил", meldOf:"комбинация: {0}", tableEmpty:"На столе пока нет комбинаций",
@@ -1852,11 +1852,12 @@ hOpen:"У вас есть выкладка на {0} — я её отметил, 
 rNoWinner:"Колода закончилась — в раунде нет победителя", youOut:"Вы вышли!", xOut:"{0} вышел!", leftInHand:"Осталось в руке", roundsWon:"раундов: {0}",
 expertTwoOnly:"При 3–4 игроках максимальный уровень — сложный: в тестах у эксперта там не было реального преимущества.", levelNoteHor:"Каждый уровень проверен против предыдущего на сотнях партий.",
 jokersN:"джокеров: {0}", joker:"Джокер", openThr:"Первая выкладка", jokers:"Джокеры", aceHigh:"Туз и после короля", aceHighSub:"Q-K-A можно (K-A-2 — никогда)",
-rulesHorHtml:"<h2>Рамми с первой выкладкой</h2><h3>Подготовка</h3><p>2–4 игрока, две колоды и джокеры. По 14 карт, одна карта открывает сброс.</p><h3>Ход</h3><p>Возьмите карту — из колоды или верхнюю из сброса — и закончите ход сбросом. Нельзя сразу сбросить карту, взятую из сброса.</p><h3>Первая выкладка</h3><p>В первый раз выложите из руки комбинации общей стоимостью <b>{thr} и больше</b>. 2–10 по номиналу, J Q K — 10, туз 1 в A-2-3 и 11 в Q-K-A или сете. Джокер стоит как карта, которую он заменяет.</p><h3>После выкладки</h3><ul><li>Выкладывайте новые комбинации.</li><li>Добавляйте карты к любой комбинации на столе: выберите карту и коснитесь комбинации.</li><li>Если у вас карта, которую заменяет джокер, можно забрать джокера — и использовать его в тот же ход.</li></ul><h3>Комбинации</h3><p>Сет: 3–4 карты одного значения разных мастей. Последовательность: 3+ подряд одной масти. В каждой комбинации минимум две настоящие карты.</p><h3>Конец</h3><p>Раунд выигрывает тот, кто сбросил последнюю карту, и получает сумму карт остальных; джокер в руке — 30. Если колода закончилась, сброс перемешивается один раз; если снова — раунд без победителя. Первый, кто наберёт цель, выигрывает партию.</p>"
+rulesHorHtml:"<h2>Рамми с первой выкладкой</h2><h3>Подготовка</h3><p>2–4 игрока, две колоды и джокеры. По 14 карт, одна карта открывает сброс.</p><h3>Ход</h3><p>Возьмите карту — из колоды или верхнюю из сброса — и закончите ход сбросом. Нельзя сразу сбросить карту, взятую из сброса.</p><h3>Первая выкладка</h3><p>В первый раз выложите из руки комбинации общей стоимостью <b>{thr} и больше</b>. 2–10 по номиналу, J Q K — 10, туз 1 в A-2-3 и 11 в Q-K-A или сете. Джокер стоит как карта, которую он заменяет.</p><h3>После выкладки</h3><ul><li>Выкладывайте новые комбинации.</li><li>Добавляйте карты к любой комбинации на столе: выберите карту и коснитесь комбинации.</li><li>Если у вас карта, которую заменяет джокер, можно забрать джокера — и использовать его в тот же ход.</li></ul><h3>Комбинации</h3><p>Сет: 3–4 карты одного значения разных мастей. Последовательность: 3+ подряд одной масти. В каждой комбинации минимум две настоящие карты.</p><h3>Конец</h3><p>Раунд выигрывает тот, у кого кончились карты — сбросом последней карты или выкладкой всех оставшихся — и получает сумму карт остальных; джокер в руке — 30. Если колода закончилась, сброс перемешивается один раз; если снова — раунд без победителя. Первый, кто наберёт цель, выигрывает партию.</p>"
 });
 
 /* ---- i18n/hor_es.js ---- */
 Object.assign(LANG.es, {
+goOut:"¡Bajar todo y cerrar! 🏁",
 upTo4:"Hasta 4 jugadores. Los huecos se pueden llenar con el ordenador.", addCpus:"Añadir ordenadores", gameRunning:"La partida ya empezó: entrarás en la siguiente", waTextHor:"¡Juega al rummy conmigo en RummyNest! Código de sala: {0}", cpusN:"{0} ordenadores", handPts:"Puntos en mano",
 hor:"Rummy (bajada 30)", horSub:"2–4 jugadores · 14 cartas · primera bajada de 30",
 roundN:"ronda {0}", openN:"bajada {0}", openedS:"bajó", meldOf:"combinación de {0}", tableEmpty:"Todavía no hay combinaciones en la mesa",
@@ -1869,11 +1870,12 @@ hOpen:"Tienes una bajada de {0}: la he marcado, pulsa Bajar", hMeld:"Baja la com
 rNoWinner:"Se acabó el mazo: ronda sin ganador", youOut:"¡Has cerrado!", xOut:"¡{0} cerró!", leftInHand:"Quedó en mano", roundsWon:"{0} rondas",
 expertTwoOnly:"Con 3–4 jugadores el nivel máximo es Difícil: en las pruebas el experto no tenía ventaja real.", levelNoteHor:"Cada nivel se midió contra el anterior en cientos de partidas.",
 jokersN:"{0} comodines", joker:"Comodín", openThr:"Primera bajada", jokers:"Comodines", aceHigh:"As también tras el rey", aceHighSub:"Q-K-A permitido (K-A-2 nunca)",
-rulesHorHtml:"<h2>Rummy con primera bajada</h2><h3>Preparación</h3><p>2–4 jugadores, dos barajas y comodines. 14 cartas cada uno; una carta empieza el descarte.</p><h3>Turno</h3><p>Roba una carta, del mazo o del descarte, y termina descartando una. No puedes descartar la carta que acabas de coger del descarte.</p><h3>Primera bajada</h3><p>La primera vez, baja de tu mano combinaciones que sumen <b>{thr} o más</b>. 2–10 su número, J Q K 10, as 1 en A-2-3 y 11 en Q-K-A o en un trío. El comodín vale la carta que sustituye.</p><h3>Después</h3><ul><li>Baja nuevas combinaciones.</li><li>Añade cartas a cualquier combinación de la mesa: elige la carta y toca la combinación.</li><li>Si tienes la carta que sustituye un comodín puedes llevártelo, y debes usarlo en el mismo turno.</li></ul><h3>Combinaciones</h3><p>Trío: 3–4 del mismo número y distinto palo. Escalera: 3+ seguidas del mismo palo. Al menos dos cartas reales en cada combinación.</p><h3>Final</h3><p>Gana la ronda quien descarta su última carta y suma las cartas de los demás; un comodín en mano vale 30. Si se acaba el mazo se baraja el descarte una vez; si vuelve a acabarse, la ronda no tiene ganador. Gana la partida quien llegue primero a la meta.</p>"
+rulesHorHtml:"<h2>Rummy con primera bajada</h2><h3>Preparación</h3><p>2–4 jugadores, dos barajas y comodines. 14 cartas cada uno; una carta empieza el descarte.</p><h3>Turno</h3><p>Roba una carta, del mazo o del descarte, y termina descartando una. No puedes descartar la carta que acabas de coger del descarte.</p><h3>Primera bajada</h3><p>La primera vez, baja de tu mano combinaciones que sumen <b>{thr} o más</b>. 2–10 su número, J Q K 10, as 1 en A-2-3 y 11 en Q-K-A o en un trío. El comodín vale la carta que sustituye.</p><h3>Después</h3><ul><li>Baja nuevas combinaciones.</li><li>Añade cartas a cualquier combinación de la mesa: elige la carta y toca la combinación.</li><li>Si tienes la carta que sustituye un comodín puedes llevártelo, y debes usarlo en el mismo turno.</li></ul><h3>Combinaciones</h3><p>Trío: 3–4 del mismo número y distinto palo. Escalera: 3+ seguidas del mismo palo. Al menos dos cartas reales en cada combinación.</p><h3>Final</h3><p>Gana la ronda quien se queda sin cartas —descartando la última o bajando todas las que le quedan— y suma las cartas de los demás; un comodín en mano vale 30. Si se acaba el mazo se baraja el descarte una vez; si vuelve a acabarse, la ronda no tiene ganador. Gana la partida quien llegue primero a la meta.</p>"
 });
 
 /* ---- i18n/hor_ar.js ---- */
 Object.assign(LANG.ar, {
+goOut:"نزّل الكل وأنهِ! 🏁",
 upTo4:"حتى 4 لاعبين. يمكن ملء المقاعد الفارغة بالكمبيوتر.", addCpus:"إضافة كمبيوتر", gameRunning:"بدأت اللعبة — ستنضم إلى التالية", waTextHor:"تعال العب معي رامي في RummyNest! رمز الغرفة: {0}", cpusN:"{0} كمبيوتر", handPts:"نقاط في اليد",
 hor:"رامي (تنزيل 30)", horSub:"2–4 لاعبين · 14 ورقة · أول تنزيل 30",
 roundN:"الجولة {0}", openN:"تنزيل {0}", openedS:"نزّل", meldOf:"مجموعة {0}", tableEmpty:"لا مجموعات على الطاولة بعد",
@@ -1886,14 +1888,14 @@ hOpen:"لديك تنزيل بقيمة {0} — حددته لك، اضغط نزّ�
 rNoWinner:"نفدت الرزمة — لا فائز في الجولة", youOut:"أنهيت!", xOut:"{0} أنهى!", leftInHand:"بقي في اليد", roundsWon:"{0} جولات",
 expertTwoOnly:"مع 3–4 لاعبين أعلى مستوى هو الصعب: في الاختبار لم يكن للخبير تفوق حقيقي.", levelNoteHor:"كل مستوى قيس مقابل الأدنى في مئات المباريات.",
 jokersN:"{0} جوكر", joker:"جوكر", openThr:"أول تنزيل", jokers:"الجوكر", aceHigh:"الآس بعد الملك أيضًا", aceHighSub:"Q-K-A مسموح (K-A-2 أبدًا)",
-rulesHorHtml:"<h2>رامي بتنزيل أول</h2><h3>التحضير</h3><p>2–4 لاعبين، رزمتان وجوكر. 14 ورقة لكل لاعب وتبدأ ورقة واحدة المرمى.</p><h3>الدور</h3><p>اسحب ورقة — من الرزمة أو أعلى المرمى — وأنهِ الدور برمي ورقة. لا يجوز رمي الورقة التي أخذتها للتو من المرمى.</p><h3>أول تنزيل</h3><p>في المرة الأولى نزّل من يدك مجموعات قيمتها معًا <b>{thr} أو أكثر</b>. 2–10 حسب الرقم، J Q K تساوي 10، الآس 1 في A-2-3 و11 في Q-K-A أو الطقم. الجوكر يساوي الورقة التي يحل محلها.</p><h3>بعد التنزيل</h3><ul><li>نزّل مجموعات جديدة.</li><li>أضف أوراقًا إلى أي مجموعة على الطاولة: اختر الورقة وانقر المجموعة.</li><li>إن كانت لديك الورقة التي يحل الجوكر محلها يمكنك أخذه — ويجب استخدامه في الدور نفسه.</li></ul><h3>المجموعات</h3><p>طقم: 3–4 من الرقم نفسه بأنواع مختلفة. متتالية: 3 أو أكثر متتالية من النوع نفسه. في كل مجموعة ورقتان حقيقيتان على الأقل.</p><h3>النهاية</h3><p>يفوز بالجولة من يرمي آخر أوراقه ويحصل على مجموع أوراق الآخرين؛ الجوكر في اليد يساوي 30. إن نفدت الرزمة يُخلط المرمى مرة واحدة؛ وإن نفدت مجددًا فلا فائز. أول من يصل إلى الهدف يفوز بالمباراة.</p>"
+rulesHorHtml:"<h2>رامي بتنزيل أول</h2><h3>التحضير</h3><p>2–4 لاعبين، رزمتان وجوكر. 14 ورقة لكل لاعب وتبدأ ورقة واحدة المرمى.</p><h3>الدور</h3><p>اسحب ورقة — من الرزمة أو أعلى المرمى — وأنهِ الدور برمي ورقة. لا يجوز رمي الورقة التي أخذتها للتو من المرمى.</p><h3>أول تنزيل</h3><p>في المرة الأولى نزّل من يدك مجموعات قيمتها معًا <b>{thr} أو أكثر</b>. 2–10 حسب الرقم، J Q K تساوي 10، الآس 1 في A-2-3 و11 في Q-K-A أو الطقم. الجوكر يساوي الورقة التي يحل محلها.</p><h3>بعد التنزيل</h3><ul><li>نزّل مجموعات جديدة.</li><li>أضف أوراقًا إلى أي مجموعة على الطاولة: اختر الورقة وانقر المجموعة.</li><li>إن كانت لديك الورقة التي يحل الجوكر محلها يمكنك أخذه — ويجب استخدامه في الدور نفسه.</li></ul><h3>المجموعات</h3><p>طقم: 3–4 من الرقم نفسه بأنواع مختلفة. متتالية: 3 أو أكثر متتالية من النوع نفسه. في كل مجموعة ورقتان حقيقيتان على الأقل.</p><h3>النهاية</h3><p>يفوز بالجولة من تنفد أوراقه — برمي الورقة الأخيرة أو بتنزيل كل ما تبقى — ويحصل على مجموع أوراق الآخرين؛ الجوكر في اليد يساوي 30. إن نفدت الرزمة يُخلط المرمى مرة واحدة؛ وإن نفدت مجددًا فلا فائز. أول من يصل إلى الهدف يفوز بالمباراة.</p>"
 });
 
 /* ---- app_core.js ---- */
 /* =====================================================================
    RummyNest — app core (storage · settings · screens · cards · sound)
    ===================================================================== */
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 const $ = s => document.querySelector(s), $$ = s => Array.from(document.querySelectorAll(s));
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const P = 'rummy_';
@@ -2296,7 +2298,7 @@ function renderGame() {
   else layoutHand(v.hand);
   if (SEL != null && !v.hand.includes(SEL)) SEL = null;
   const b = RC.best(v.hand); if (!hidden) $('#myDw').textContent = b.dw;
-  const ck = $('#canKnock'); ck.classList.add('hide');
+  const ck = $('#canKnock'); ck.classList.add('hide'); ck.onclick = null;
   let minDw = 99;
   if (myTurn && v.phase === 'disc') for (const c of v.hand) if (c !== v.took) minDw = Math.min(minDw, RC.best(v.hand.filter(x => x !== c)).dw);
   if (myTurn && v.phase === 'disc' && minDw <= GIN.KNOCK && !hidden) { ck.textContent = minDw === 0 ? T('ginPossible') : T('canKnock'); ck.className = 'chip go'; }
@@ -2663,7 +2665,7 @@ function renderHor() {
   $('#myDw').textContent = hidden ? '–' : p.v; $('.dwline [data-t]').textContent = T('handPts');
   $('#mySort').textContent = T('sort_' + ST.sort);
   const ck = $('#canKnock'); ck.classList.add('hide');
-  if (myTurn && v.phase === 'play' && !v.opened[s] && !hidden) { const ov = HOR.plan(v.hand, v.aceHigh, 'open').v; if (ov >= v.threshold) { ck.textContent = T('canOpen'); ck.className = 'chip go'; } }
+  if (myTurn && v.phase === 'play' && !v.opened[s] && !hidden) { const ov = HOR.plan(v.hand, v.aceHigh, 'open').v; if (ov >= v.threshold) { ck.textContent = T('canOpen') + ' 👆'; ck.className = 'chip go'; ck.onclick = () => { const o = HOR.plan(curView().hand, v.aceHigh, 'open'); STAGE = o.melds.map(m => m.slice()); SELS = []; beep('card'); renderGame(); }; } }
   // stage bar (building the opening)
   const sb = $('#hStage');
   if (STAGE.length && myTurn && !hidden) {
@@ -2681,7 +2683,7 @@ function renderHor() {
     const mustLeft = v.must.filter(c => v.hand.includes(c));
     msg.textContent = mustLeft.length ? T('mustUseJ') : !v.opened[s] ? T('openMsg', v.threshold) : T('playMsg');
     if (!v.opened[s]) setBtn(A, selMeld ? T('addToOpen', selMeld.value) : T('buildMeld'), !!selMeld, selMeld ? 'hot' : '');
-    else setBtn(A, selMeld ? T('putMeld', selMeld.value) : T('buildMeld'), !!selMeld && v.hand.length - SELS.length >= 1, selMeld ? 'hot' : '');
+    else setBtn(A, selMeld ? (SELS.length === v.hand.length ? T('goOut') : T('putMeld', selMeld.value)) : T('buildMeld'), !!selMeld, selMeld ? 'hot' : '');
     const thOk = isGuest() ? one != null && !mustLeft.length && !(one === v.took && v.tookFrom === 'd' && v.hand.length > 1) : one != null && HOR.legal(G.M, s, { a: 'discard', c: one });
     setBtn(B, one != null ? T('throwX', cardTxt(one)) : T('throw'), !!thOk && !STAGE.length, 'main');
     if (one != null && one === v.took && v.tookFrom === 'd' && v.hand.length > 1) msg.textContent = T('noThrowBack');
@@ -2733,7 +2735,6 @@ function horTapMeld(i) {
   const c = SELS[0], m = v.table[i];
   if (HOR.swapFit(m, c) != null) return horDo({ a: 'swap', c, m: i });
   if (HOR.fitLay(m, c, v.aceHigh)) {
-    if (v.hand.length < 2) { toast(T('keepOne')); return; }
     return horDo({ a: 'lay', c, m: i });
   }
   beep('err'); toast(T('noFit', cardTxt(c)));
@@ -2745,8 +2746,6 @@ function horBtnA() {
   if (v.phase === 'draw') return horDo({ a: 'draw' });
   const vm = SELS.length >= 3 ? HOR.validMeld(SELS, v.aceHigh) : null; if (!vm) return;
   if (!v.opened[v.seat]) {
-    const staged = [].concat(...STAGE).length + SELS.length;
-    if (v.hand.length - staged < 1) { toast(T('keepOne')); return; }
     STAGE.push(SELS.slice()); SELS = []; beep('card'); renderGame(); return;
   }
   horDo({ a: 'meld', cards: SELS.slice() });
