@@ -268,6 +268,10 @@ input.in,select.in{width:100%;min-height:48px;border-radius:12px;border:1.5px so
 .rset.add{min-width:96px;justify-content:center;color:var(--feltInk);opacity:.85;font-size:14px;direction:inherit}
 .rt{display:inline-block;line-height:0;border-radius:8px;position:relative}
 .rt.pk{outline:3px solid var(--acc2);outline-offset:1px;transform:translateY(-4px)}
+.rt.newin{animation:dropin .5s cubic-bezier(.2,1.4,.4,1) both;border-radius:8px;box-shadow:0 0 0 3px #f0cd6e,0 0 14px #f0cd6e}
+.rset.changed{animation:flash 1.2s ease 2}
+@keyframes dropin{0%{transform:translateY(-40px) scale(.6);opacity:0}100%{transform:none;opacity:1}}
+@keyframes flash{50%{background:rgba(240,205,110,.25)}}
 .rt.mine::before{content:"";position:absolute;left:50%;top:-5px;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:#46d07a;z-index:2}
 .hand .pc.canlay::after{content:"";position:absolute;top:calc(var(--w)*.06);right:calc(var(--w)*.08);width:12px;height:12px;border-radius:50%;background:#46d07a;box-shadow:0 0 0 2px #fff;animation:pulse 1.6s ease-in-out infinite}
 #confetti{position:fixed;inset:0;z-index:90;pointer-events:none}
@@ -1640,7 +1644,7 @@ const RKB = (() => {
   /* ===================================================================
      COMPUTER: 0 easy (own sets only) · 1 medium (+ lay-offs) · 2 hard (rearranges the table) · 3 expert (bigger search)
      =================================================================== */
-  const LV = { 0: { lay: false, solve: 0 }, 1: { lay: true, solve: 0 }, 2: { lay: true, solve: 25000 }, 3: { lay: true, solve: 60000, keepJ: true } };
+  const LV = { 0: { lay: false, solve: 0 }, 1: { lay: true, solve: 0 }, 2: { lay: true, solve: 20000, window: 24 }, 3: { lay: true, solve: 50000, window: 36, keepJ: true } };
   function act(v, level) {
     const L = LV[level] || LV[1], s = v.seat, hand = v.hand;
     if (v.phase !== 'play' || v.turn !== s) return null;
@@ -1650,8 +1654,19 @@ const RKB = (() => {
       return { a: 'draw' };
     }
     let best = null, bestUsed = 0;
-    const consider = t => { if (!t) return; const old = new Set(flat(v.table)), used = flat(t).filter(c => !old.has(c)); const val = used.reduce((x, c) => x + pen(c), 0) + used.length * .01; if (used.length && val > bestUsed) { best = t; bestUsed = val; } };
-    if (L.solve) { const r = solve(flat(v.table), hand, L.solve); if (r) consider(r.table); }
+    const consider = t => { if (!t) return; const old = new Set(flat(v.table)), used = flat(t).filter(c => !old.has(c)); const val = used.length * 12 + used.reduce((x, c) => x + pen(c), 0); if (used.length && val > bestUsed) { best = t; bestUsed = val; } };
+    if (L.solve) {
+      // only the sets near my tiles take part — the rest of the table stays as it is (keeps the search small)
+      const near = (c, r) => isJ(c) || isJ(r) || rk(c) === rk(r) || (su(c) === su(r) && Math.abs(rk(c) - rk(r)) <= 2);
+      const score = t => t.reduce((x, c) => x + hand.filter(r => near(c, r)).length, 0);
+      const idx = v.table.map((t, i) => ({ i, sc: score(t) })).filter(x => x.sc > 0).sort((a, b) => b.sc - a.sc);
+      const pick = new Set(); let size = 0;
+      for (const x of idx) { if (size + v.table[x.i].length > L.window) continue; pick.add(x.i); size += v.table[x.i].length; }
+      const keep = v.table.filter((_, i) => !pick.has(i)), part = v.table.filter((_, i) => pick.has(i));
+      let r = solve(flat(part), hand, L.solve);
+      if (!r && part.length > 2) { const p2 = part.slice(0, Math.ceil(part.length / 2)); r = solve(flat(p2), hand, L.solve); if (r) r.table = r.table.concat(part.slice(p2.length)); }
+      if (r) consider(keep.concat(r.table));
+    }
     // own sets from the rack, then lay-offs
     const own = solve([], hand, 30000);
     let t = v.table.slice();
@@ -2078,6 +2093,12 @@ rulesHtml:"<h3>الهدف</h3><p>لاعبان. رتّب أوراقك العشر 
 
 /* ---- i18n/hor_he.js ---- */
 Object.assign(LANG.he, {
+xPlaced:"{0} הניח {1} אבנים",
+cardsRummy:"קלפים (רמי קלפים)",
+rkbCardsName:"רמי קלפים",
+turnTimer:"זמן לתור",
+off:"בלי",
+timeUp:"נגמר הזמן — השולחן חזר למקום ושלפת אבן",
 rkb:"רמיקוב",
 rkbSub:"2–4 שחקנים · 14 אבנים · מסדרים את כל השולחן מחדש",
 pool:"קופה",
@@ -2098,7 +2119,7 @@ placedN:"הניח {0}",
 drewTile:"שלף אבן",
 rkbHintDraw:"אין מהלך טוב — כדאי לשלוף אבן",
 rkbHintN:"סידרתי לך את השולחן: {0} אבנים יורדות ({1} נקודות). לחץ סיימתי, או ↶ כדי לבטל",
-levelNoteRkb:"קשה ומומחה יודעים לפרק ולסדר את השולחן מחדש. קל ובינוני רק מורידים ומוסיפים.",
+levelNoteRkb:"קשה יודע לפרק ולסדר את השולחן מחדש — במדידה הוא ניצח את בינוני ב-99%. קל ובינוני רק מורידים ומוסיפים.",
 waTextRkb:"בוא לשחק איתי רמיקוב ב-RummyNest! קוד החדר: {0}",
 rulesRkbHtml:"<h2>רמיקוב</h2><h3>הכנה</h3><p>2–4 שחקנים, 106 אבנים: 1–13 בארבעה צבעים, פעמיים כל אחת, ושני ג'וקרים. כל אחד מקבל 14 אבנים.</p><h3>תור</h3><p>או שמניחים אבנים על השולחן, או ששולפים אבן אחת מהקופה והתור נגמר.</p><h3>הורדה ראשונה</h3><p>סדרות חדשות מהמעמד בלבד, ששוות יחד <b>{thr} לפחות</b> (סכום המספרים). עד אז אסור לגעת בסדרות שעל השולחן.</p><h3>אחרי ההורדה</h3><p>כל השולחן פתוח: מפרקים, מזיזים ומסדרים מחדש כמו שרוצים — בתנאי שבסוף התור כל הסדרות תקינות, כל האבנים שהיו על השולחן עדיין שם, והנחת לפחות אבן אחת מהמעמד. אבן מהשולחן לא חוזרת למעמד.</p><h3>איך עושים את זה כאן</h3><p>מקישים על אבן (או כמה) ואז על הסדרה שאליה הן הולכות, או על ＋ סדרה חדשה. סדרה לא תקינה מסומנת באדום. ↶ מחזיר את השולחן להתחלת התור. 💡 מסדר לך את השולחן הכי טוב שהמחשב מוצא.</p><h3>סדרות</h3><p>קבוצה: 3–4 אבנים מאותו מספר בצבעים שונים. רצף: 3 ומעלה ברצף מאותו צבע. 1 הוא תמיד הכי נמוך (13-1-2 לא חוקי). ג'וקר מחליף כל אבן.</p><h3>סיום</h3><p>מי שמרוקן את המעמד מנצח ומקבל את סכום האבנים של כל השאר (ג'וקר שווה 30). אם הקופה נגמרה ואף אחד לא יכול לשחק — מנצח מי שנשאר עם הסכום הנמוך ביותר.</p>",
 daily:"אתגר יומי",
@@ -2158,6 +2179,12 @@ rulesHorHtml:"<h2>רמי הורדות</h2><h3>הכנה</h3><p>2–4 שחקנים
 
 /* ---- i18n/hor_en.js ---- */
 Object.assign(LANG.en, {
+xPlaced:"{0} put down {1} tiles",
+cardsRummy:"Cards (card rummy)",
+rkbCardsName:"Card rummy",
+turnTimer:"Turn timer",
+off:"Off",
+timeUp:"Time's up — the table is back and you drew a tile",
 rkb:"Rummikub-style",
 rkbSub:"2–4 players · 14 tiles · rearrange the whole table",
 pool:"Pool",
@@ -2178,7 +2205,7 @@ placedN:"placed {0}",
 drewTile:"drew a tile",
 rkbHintDraw:"No good move — draw a tile",
 rkbHintN:"I arranged the table: {0} tiles go down ({1} points). Tap Done, or ↶ to undo",
-levelNoteRkb:"Hard and Expert break up and rearrange the table. Easy and Medium only lay down and add.",
+levelNoteRkb:"Hard breaks up and rearranges the table — in testing it beat Medium 99% of the time. Easy and Medium only lay down and add.",
 waTextRkb:"Come play Rummikub-style rummy with me on RummyNest! Room code: {0}",
 rulesRkbHtml:"<h2>Rummikub-style</h2><h3>Setup</h3><p>2–4 players, 106 tiles: 1–13 in four colours, twice each, and two jokers. 14 tiles each.</p><h3>A turn</h3><p>Either put tiles on the table, or draw one tile from the pool and your turn ends.</p><h3>First meld</h3><p>New sets from your rack only, worth <b>{thr} or more</b> together (sum of the numbers). Until then you may not touch the sets on the table.</p><h3>After that</h3><p>The whole table is open: split, move and rearrange as you like — as long as at the end of your turn every set is valid, every tile that was on the table is still there, and you added at least one tile from your rack. Table tiles never go back to a rack.</p><h3>How to do it here</h3><p>Tap a tile (or several), then the set they go to, or ＋ New set. An invalid set is red. ↶ puts the table back as it was. 💡 arranges the best table the computer finds.</p><h3>Sets</h3><p>Group: 3–4 of one number in different colours. Run: 3+ in a row in one colour. 1 is always low (13-1-2 is not allowed). A joker stands for any tile.</p><h3>Ending</h3><p>Whoever empties their rack wins and scores the others' tiles (joker 30). If the pool is empty and nobody can play, the lowest rack wins.</p>",
 daily:"Daily challenge",
@@ -2238,6 +2265,12 @@ rulesHorHtml:"<h2>Rummy with a first meld</h2><h3>Setup</h3><p>2–4 players, tw
 
 /* ---- i18n/hor_ru.js ---- */
 Object.assign(LANG.ru, {
+xPlaced:"{0} выложил {1}",
+cardsRummy:"Карты (карточный рамми)",
+rkbCardsName:"Карточный рамми",
+turnTimer:"Время на ход",
+off:"Без",
+timeUp:"Время вышло — стол вернулся, вы взяли фишку",
 rkb:"Руммикуб",
 rkbSub:"2–4 игрока · 14 фишек · переставляйте весь стол",
 pool:"Банк",
@@ -2313,6 +2346,12 @@ rulesHorHtml:"<h2>Рамми с первой выкладкой</h2><h3>Подг
 
 /* ---- i18n/hor_es.js ---- */
 Object.assign(LANG.es, {
+xPlaced:"{0} puso {1} fichas",
+cardsRummy:"Cartas (rummy de cartas)",
+rkbCardsName:"Rummy de cartas",
+turnTimer:"Tiempo por turno",
+off:"Sin",
+timeUp:"Se acabó el tiempo: la mesa vuelve y robas",
 rkb:"Rummikub",
 rkbSub:"2–4 jugadores · 14 fichas · reordena toda la mesa",
 pool:"Pozo",
@@ -2388,6 +2427,12 @@ rulesHorHtml:"<h2>Rummy con primera bajada</h2><h3>Preparación</h3><p>2–4 jug
 
 /* ---- i18n/hor_ar.js ---- */
 Object.assign(LANG.ar, {
+xPlaced:"{0} وضع {1} أحجار",
+cardsRummy:"أوراق (رامي الأوراق)",
+rkbCardsName:"رامي الأوراق",
+turnTimer:"وقت الدور",
+off:"بدون",
+timeUp:"انتهى الوقت — عادت الطاولة وسحبت حجرًا",
 rkb:"روميكوب",
 rkbSub:"2–4 لاعبين · 14 حجرًا · أعد ترتيب الطاولة كلها",
 pool:"المخزون",
@@ -2465,7 +2510,7 @@ rulesHorHtml:"<h2>رامي بتنزيل أول</h2><h3>التحضير</h3><p>2�
 /* =====================================================================
    RummyNest — app core (storage · settings · screens · cards · sound)
    ===================================================================== */
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.2.0';
 const $ = s => document.querySelector(s), $$ = s => Array.from(document.querySelectorAll(s));
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const P = 'rummy_';
@@ -2687,7 +2732,7 @@ function curView() {
 function nameOf(v, s) {
   if (v.g === 'hor' || v.g === 'rkb') return horName(v, s);
   if (v.names && v.names[s]) return v.names[s];
-  if (G && G.mode === 'cpu') return s === 1 ? T('computer') + ' · ' + T(LVL[G.level]) : (ST.name || T('you'));
+  if (G && (G.mode === 'cpu' || G.mode === 'daily')) return s === 1 ? T('computer') + ' · ' + T(LVL[G.level]) : (ST.name || T('you'));
   return s === v.seat ? T('you') : T('opponent');
 }
 
@@ -2746,7 +2791,7 @@ function aiSeat() {
   if (!G || !G.M || G.M.over || rnd(G.M).phase === 'end') return null;
   const t = rnd(G.M).turn;
   if (G.bots && G.bots[t] != null) return t;
-  if (G.mode === 'cpu' && !isHor() && t === 1) return 1;
+  if ((G.mode === 'cpu' || G.mode === 'daily') && !isHor() && t === 1) return 1;
   if (isHostOnline() && G.subs && G.subs[t]) return t;
   return null;
 }
@@ -2779,9 +2824,14 @@ function scheduleAI() {
 }
 
 /* ---------- hand end: stats, replays, sounds ---------- */
+function dailyRecord(res, log, lose) {
+  const D = LS.get('daily', {}), k = G.daily && G.daily.key;
+  if (k && G.daily.official && !D[k]) { D[k] = { win: res.winner === 0, turns: myTurns(log), pts: res.winner === 0 ? res.pts : -lose, hints: G.hints || 0 }; LS.set('daily', D); }
+}
 function onHandEnd() {
   if (isHor()) return horHandEnd();
   const M = G.M, H = M.H, res = H.res, key = G.id + ':' + M.handNo; G.counted[key] = 1;
+  if (G.mode === 'daily') { M.over = true; M.winner = res.winner; dailyRecord(res, H.log, res.pts || 0); }
   const me = G.mode === 'two' ? null : mySeat();
   if (res.type === 'gin' || res.type === 'biggin') beep('gin'); else if (res.type === 'knock') beep('knock');
   // replays: last 10 hands (seed + moves)
@@ -3077,6 +3127,7 @@ function resultTitle(res) {
   return res.undercut ? T('rUndercut') : T('rKnock');
 }
 function showResult(v) {
+  if (G.mode === 'daily') return dailyResult(v);
   closeAllOv();
   const res = v.res, s = v.seat, o = 1 - s;
   let body = '<h3>' + esc(resultTitle(res)) + '</h3>';
@@ -3112,6 +3163,7 @@ function showScores(v) {
   o.querySelector('[data-c]').onclick = () => closeOv(o);
 }
 function showFinal(v) {
+  if (G.mode === 'daily') return dailyResult(v);
   closeAllOv();
   const f = v.final, s = v.seat, o = 1 - s, won = v.winner === s;
   const head = G.mode === 'two' ? T('winsX', nameOf(v, v.winner)) : won ? T('youWon') : T('youLost');
@@ -3455,6 +3507,7 @@ function horScores(v) {
   o.querySelector('[data-c]').onclick = () => closeOv(o);
 }
 function horFinal(v) {
+  if (G.mode === 'daily') return dailyResult(v);
   closeAllOv();
   const rank = Array.from({ length: v.n }, (_, i) => i).sort((a, b) => v.scores[b] - v.scores[a]), won = v.winner === v.seat;
   const head = G.mode === 'two' ? T('winsX', horName(v, v.winner)) : won ? T('youWon') : T('youLost');
@@ -3490,11 +3543,12 @@ function horSetup(mode) {
   let h = '<h3>' + esc(T(ST.variant)) + ' · ' + esc(mode === 'cpu' ? T('vsCpu') : T('twoPhone')) + '</h3><label class="f">' + esc(T('players')) + '</label><div class="seg" id="hsN">' + [2, 3, 4].map(n => '<button data-v="' + n + '" class="' + (n === n0 ? 'on' : '') + '">' + n + '</button>').join('') + '</div>';
   if (mode === 'cpu') h += '<label class="f">' + esc(T('chooseLevel')) + '</label><div class="lvls" id="hsL"></div><p class="muted" id="hsNote"></p>' + (ST.variant === 'rkb' ? '' : '<label class="f">' + esc(T('persLbl')) + '</label><div class="seg" id="hsP">' + ['mix', 'careful', 'bold', 'guard', 'none'].map(k => '<button data-p="' + k + '" class="' + ((ST.horPers || 'mix') === k ? 'on' : '') + '">' + esc(T('pp_' + k)) + '</button>').join('') + '</div><p class="muted" id="hsPN">' + esc(T('pd_' + (ST.horPers || 'mix'))) + '</p>');
   else h += '<div id="hsNames"></div>';
+  if (ST.variant === 'rkb') h += '<label class="f">' + esc(T('pieces')) + '</label><div class="seg" id="hsS">' + [['tiles', '🀄 ' + T('tiles')], ['cards', '🃏 ' + T('cardsRummy')]].map(([k, l]) => '<button data-k="' + k + '" class="' + (ST.skin === k ? 'on' : '') + '">' + esc(l) + '</button>').join('') + '</div><label class="f">' + esc(T('turnTimer')) + '</label><div class="seg" id="hsT">' + [[0, T('off')], [60, '1:00'], [120, '2:00']].map(([k, l]) => '<button data-k="' + k + '" class="' + ((ST.rkbTimer || 0) === k ? 'on' : '') + '">' + esc(l) + '</button>').join('') + '</div>';
   h += '<p class="muted" style="margin:8px 0 0">' + esc(T('openN', ST.horThr) + ' · ' + T('toN', ST.horTarget) + ' · ' + T('jokersN', ST.horJokers)) + ' · <a href="#" id="qrSet" style="color:var(--acc)">' + esc(T('change')) + '</a></p><div class="row" style="margin-top:12px"><button class="btn ghosty" data-c>' + esc(T('cancel')) + '</button><button class="btn main" data-g>' + esc(T('startGame')) + '</button></div>';
   const o = overlay(h); let n = n0, lvl = Math.min(ST.level, 3);
   const draw = () => {
     if (mode === 'cpu') {
-      const max = ST.variant === 'rkb' ? 3 : n > 2 ? 2 : 3; if (lvl > max) lvl = max;
+      const max = ST.variant === 'rkb' ? 2 : n > 2 ? 2 : 3; if (lvl > max) lvl = max;
       $('#hsL').innerHTML = LVL.slice(0, max + 1).map((k, i) => '<button class="btn ' + (i === lvl ? 'main' : '') + '" data-l="' + i + '">' + esc(T(k)) + '</button>').join('');
       $('#hsNote').textContent = ST.variant === 'rkb' ? T('levelNoteRkb') : n > 2 ? T('expertTwoOnly') : T('levelNoteHor');
     } else {
@@ -3507,6 +3561,8 @@ function horSetup(mode) {
     const nb = e.target.closest('#hsN [data-v]'); if (nb) { n = +nb.dataset.v; $$('#hsN button').forEach(b => b.classList.toggle('on', b === nb)); draw(); return; }
     const lb = e.target.closest('[data-l]'); if (lb) { lvl = +lb.dataset.l; draw(); return; }
     if (e.target.closest('[data-c]')) { closeOv(o); return; }
+    const sb = e.target.closest('#hsS [data-k]'); if (sb) { ST.skin = sb.dataset.k; saveST(); applyLook(); $$('#hsS button').forEach(x => x.classList.toggle('on', x === sb)); return; }
+    const tb = e.target.closest('#hsT [data-k]'); if (tb) { ST.rkbTimer = +tb.dataset.k; saveST(); $$('#hsT button').forEach(x => x.classList.toggle('on', x === tb)); return; }
     const pb = e.target.closest('#hsP [data-p]'); if (pb) { ST.horPers = pb.dataset.p; saveST(); $$('#hsP button').forEach(x => x.classList.toggle('on', x === pb)); $('#hsPN').textContent = T('pd_' + pb.dataset.p); return; }
     if (e.target.closest('[data-g]')) {
       LS.set('horN', n);
@@ -3520,8 +3576,7 @@ function horHandEnd() {
   const M = G.M, R = M.R, res = R.res; G.counted[G.id + ':' + M.roundNo] = 1;
   if (G.mode === 'daily') {
     M.over = true; M.winner = res.winner;
-    const D = LS.get('daily', {}), k = G.daily && G.daily.key;
-    if (k && G.daily.official && !D[k]) { D[k] = { win: res.winner === 0, turns: myTurns(R.log), pts: res.winner === 0 ? res.pts : -res.left[0], hints: G.hints || 0 }; LS.set('daily', D); }
+    dailyRecord(res, R.log, res.left[0]);
   }
   const me = G.mode === 'two' ? null : mySeat();
   beep(res.winner === me || me == null ? 'gin' : 'knock');
@@ -3530,6 +3585,11 @@ function horHandEnd() {
   b.hp++; if (me != null && res.winner === me) { b.hw++; b.best = Math.max(b.best, res.pts); }
   if (M.over && !G.counted['m' + G.id]) { G.counted['m' + G.id] = 1; b.mp++; if (me != null && M.winner === me) b.mw++; beep(me == null || M.winner === me ? 'win' : 'lose'); }
   LS.set('stats', S);
+  if (G.var === 'rkb') {
+    const RP = LS.get('replays', []), vv = RKB.view(M, 0);
+    RP.unshift({ var: 'rkb', d: Date.now(), mode: G.mode, names: Array.from({ length: M.n }, (_, i) => horName(vv, i)), seat: me == null ? 0 : me, seed: R.seed, dealer: R.dealer, log: R.log.map(e => e.slice()), n: M.n, jokers: M.jokers, threshold: M.threshold, winner: res.winner, pts: res.pts });
+    RP.length = Math.min(RP.length, 10); LS.set('replays', RP);
+  }
   if (G.var !== 'hor') { saveGame(); return; }
   const RP = LS.get('replays', []), vv = HOR.view(M, 0);
   RP.unshift({ var: 'hor', d: Date.now(), mode: G.mode, names: Array.from({ length: M.n }, (_, i) => horName(vv, i)), seat: me == null ? 0 : me, seed: R.seed, dealer: R.dealer, log: R.log.slice(), n: M.n, jokers: M.jokers, threshold: M.threshold, aceHigh: M.aceHigh, winner: res.winner, pts: res.pts });
@@ -3586,14 +3646,22 @@ function wkSort(set) { const m = RKB.meld(set.tiles); if (m) set.tiles = m.cards
 function where(c) { const s = WK.sets.find(x => x.tiles.includes(c)); return s ? s.id : 'rack'; }
 function opening(v) { return WK.sets.filter(s => s.fresh && s.tiles.length && RKB.meld(s.tiles)).reduce((t, s) => t + RKB.meld(s.tiles).value, 0); }
 
+let LASTNEW = new Set(), LASTKEY = null;
 function renderRkb() {
   const v = curView(); if (!v) return;
+  { // tiles the previous player just put down (not mine)
+    const last = v.log.length ? v.log[v.log.length - 1] : null, k = v.roundNo + ':' + v.log.length;
+    if (k !== LASTKEY) {
+      LASTKEY = k; LASTNEW = new Set(last && last[1] === 'commit' && last[0] !== v.seat ? last[2] : []);
+      if (LASTNEW.size) { toast(T('xPlaced', horName(v, last[0]), LASTNEW.size), 2600); setTimeout(() => { LASTNEW = new Set(); $$('#hTable .newin').forEach(e => e.classList.remove('newin')); $$('#hTable .changed').forEach(e => e.classList.remove('changed')); }, 4000); }
+    }
+  }
   const s = v.seat, myTurn = v.turn === s && v.phase !== 'end', hidden = G.mode === 'two' && PASS_ON && v.phase !== 'end';
   wkEnsure(v);
   ['#opp', '#oHand', '#oKnown', '#pDisc'].forEach(q => $(q).classList.add('hide'));
   ['#hOpps', '#hTable'].forEach(q => $(q).classList.remove('hide'));
   $('#hStage').classList.add('hide');
-  $('#gTitle').textContent = T('rkb') + ' · ' + T('roundN', v.roundNo);
+  $('#gTitle').textContent = T(ST.skin === 'cards' ? 'rkbCardsName' : 'rkb') + ' · ' + T('roundN', v.roundNo);
   $('#gSub').textContent = T('toN', v.target) + ' · ' + T('openN', v.threshold);
   $('#gScore').textContent = iso(String(v.scores[s]));
   let oh = '';
@@ -3608,7 +3676,7 @@ function renderRkb() {
   const canEdit = myTurn && !hidden;
   let th = WK.sets.filter(x => x.tiles.length).map(x => {
     const m = RKB.meld(x.tiles), cls = x.tiles.length && !m ? 'bad' : (x.fresh ? 'fresh' : '');
-    return '<div class="rset ' + cls + (PICK.length && where(PICK[0]) !== x.id ? ' tgt' : '') + '" data-set="' + x.id + '">' + x.tiles.map(c => '<span class="rt' + (PICK.includes(c) ? ' pk' : '') + (WK.rack0.includes(c) ? ' mine' : '') + '" data-c="' + c + '">' + jkCard(c, m && m.jr, tw) + '</span>').join('') + '</div>';
+    return '<div class="rset ' + cls + (PICK.length && where(PICK[0]) !== x.id ? ' tgt' : '') + (x.tiles.some(c => LASTNEW.has(c)) ? ' changed' : '') + '" data-set="' + x.id + '">' + x.tiles.map(c => '<span class="rt' + (PICK.includes(c) ? ' pk' : '') + (LASTNEW.has(c) ? ' newin' : '') + (WK.rack0.includes(c) ? ' mine' : '') + '" data-c="' + c + '">' + jkCard(c, m && m.jr, tw) + '</span>').join('') + '</div>';
   }).join('');
   if (canEdit) th += '<div class="rset add' + (PICK.length ? ' tgt' : '') + '" data-set="new">＋ ' + esc(T('newSet')) + '</div>';
   if (!th) th = '<div class="muted hempty">' + esc(T('tableEmpty')) + '</div>';
@@ -3626,7 +3694,7 @@ function renderRkb() {
   el.innerHTML = sorted.map(c => cardHTML(c, (PICK.includes(c) ? 'sel ' : '') + (c === NEWC ? 'new' : ''), 'style="--w:' + rw + 'px" tabindex="0" role="button"')).join('') || (hidden ? '' : '<div class="muted">' + esc(T('rackEmpty')) + '</div>');
   $('#myDw').textContent = hidden ? '–' : rack.reduce((t, c) => t + RKB.pen(c), 0); $('.dwline [data-t]').textContent = T('handPts');
   $('#mySort').textContent = T(ST.sort === 'rank' ? 'sort_rank' : 'sort_color');
-  $('#canKnock').classList.add('hide');
+  $('#canKnock').classList.add('hide'); rkbTimer(v);
   // message + buttons
   const msg = $('#gMsg'), A = $('#bA'), B = $('#bB');
   const err = myTurn ? rkbProblem(v) : '';
@@ -3635,7 +3703,7 @@ function renderRkb() {
   else {
     const ch = wkChanged(v);
     msg.textContent = !ch ? (v.opened[s] ? T('rkbMsg') : T('rkbOpenMsg', v.threshold)) : err ? T('rkbErr_' + err, v.threshold, opening(v)) : T('rkbReady');
-    setBtn(A, T('drawTile'), !ch, ch ? '' : '');
+    setBtn(A, T(ST.skin === 'cards' ? 'fromStock' : 'drawTile'), !ch, '');
     setBtn(B, '✓ ' + T('done'), ch && !err, 'main');
   }
   if (hidden) { setBtn(A, '…', false); setBtn(B, '…', false, 'main'); }
@@ -3646,6 +3714,22 @@ function renderRkb() {
   if (v.phase === 'end' && !$('#ovs .ov') && !G.resSeen) horResult(v);
 }
 /* what still stops "done" ('' = good to go) */
+let RT = { key: null, end: 0, iv: null };
+function rkbTimer(v) {
+  const secs = ST.rkbTimer || 0, chip = $('#canKnock');
+  const mine = v.turn === v.seat && v.phase === 'play' && !(G.mode === 'two' && PASS_ON);
+  if (!secs || !mine) { if (RT.iv) { clearInterval(RT.iv); RT.iv = null; } RT.key = null; return; }
+  const k = wkKey(v);
+  if (RT.key !== k) { RT.key = k; RT.end = Date.now() + secs * 1000; clearInterval(RT.iv); RT.iv = setInterval(() => { const vv = curView(); if (!vv || !isRkb()) { clearInterval(RT.iv); RT.iv = null; return; } rkbTick(vv); }, 500); }
+  rkbTick(v);
+}
+function rkbTick(v) {
+  const chip = $('#canKnock'), left = Math.max(0, Math.ceil((RT.end - Date.now()) / 1000));
+  if (!RT.key || RT.key !== wkKey(v)) return;
+  chip.className = 'chip' + (left <= 10 ? ' go' : ''); chip.textContent = '⏱ ' + iso(Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0'));
+  if (left <= 10 && left > 0 && left % 2 === 0) beep('turn');
+  if (left === 0) { clearInterval(RT.iv); RT.iv = null; RT.key = null; toast('⏱ ' + T('timeUp'), 3500); wkInit(v); rkbDo({ a: 'draw' }); }
+}
 function rkbProblem(v) {
   if (!wkChanged(v)) return '';
   if (WK.sets.some(x => x.tiles.length && !RKB.meld(x.tiles))) return 'invalid';
@@ -3707,13 +3791,37 @@ function rkbHint() {
   G.hints = (G.hints || 0) + 1; saveGame();
   toast('💡 …', 900);
   setTimeout(() => {
-    const a = RKB.act(v, 3);
+    const a = RKB.act(v, 2);
     if (a.a === 'draw') { wkInit(v); renderGame(); toast('💡 ' + T('rkbHintDraw'), 4500); return; }
     const old = v.table.map(t => t.slice().sort().join());
     let id = 0; WK = { key: wkKey(v), sets: a.table.map(t => ({ id: id++, tiles: RKB.meld(t).cards, fresh: !old.includes(t.slice().sort().join()) })), nextId: 1000, rack0: v.hand.slice() };
     PICK = []; renderGame();
     const n = wkPlaced(v).length; toast('💡 ' + T('rkbHintN', n, wkPlaced(v).reduce((t, c) => t + RKB.pen(c), 0)), 5200);
   }, 30);
+}
+function rkbReplay(r) {
+  const M = RKB.newMatch({ seed: r.seed, players: r.n, dealer: r.dealer, jokers: r.jokers, threshold: r.threshold, target: 1e9 });
+  const frames = [JSON.parse(JSON.stringify(M.R))], acts = [];
+  for (const e of r.log) {
+    const a = e[1] === 'commit' ? { a: 'commit', table: e[3] } : { a: 'draw' };
+    if (!RKB.apply(M, e[0], a)) break; frames.push(JSON.parse(JSON.stringify(M.R))); acts.push(e);
+  }
+  let i = 0, auto = null;
+  const o = overlay('<h3>' + esc(T('replay')) + '</h3><div class="rp" id="rpBody"></div><div class="row" dir="ltr" style="margin-top:10px"><button class="btn" data-k="0">⏮</button><button class="btn" data-k="-1">◀</button><button class="btn main" data-k="p">▶</button><button class="btn" data-k="1">▶|</button><button class="btn" data-k="9">⏭</button></div><div class="row" style="margin-top:8px"><button class="btn ghosty" data-k="x">' + esc(T('close')) + '</button></div>', 'center');
+  const srt = h => h.slice().sort((a, b) => (a >= 104) - (b >= 104) || RC.suit(a % 52) - RC.suit(b % 52) || RC.rank(a) - RC.rank(b));
+  function draw() {
+    const F = frames[i], e = i ? acts[i - 1] : null, fresh = new Set(e && e[1] === 'commit' ? e[2] : []);
+    $('#rpBody').innerHTML = F.hands.map((h, s) => '<div><b>' + esc(r.names[s] || '') + '</b> <span class="muted">' + h.length + '</span><div class="hrow">' + srt(h).map(c => cardHTML(c)).join('') + '</div></div>').join('') +
+      '<div class="hrow" style="gap:6px">' + F.table.map(t => { const m = RKB.meld(t); return '<span style="display:inline-flex;gap:1px;padding:2px;border-radius:6px;background:rgba(0,0,0,.15)">' + t.map(c => '<span class="rt' + (fresh.has(c) ? ' newin' : '') + '">' + jkCard(c, m && m.jr, 22) + '</span>').join('') + '</span>'; }).join('') + '</div>' +
+      '<p style="text-align:center;min-height:40px">' + esc(e ? (r.names[e[0]] || '') + ': ' + (e[1] === 'commit' ? T('placedN', e[2].length) : e[1] === 'pass' ? T('passed') : T('drewTile')) : T('dealt')) + (i === frames.length - 1 && F.res ? ' — ' + esc(T('xOut', r.names[F.res.winner])) + ' +' + F.res.pts : '') + '</p><p class="muted" style="text-align:center">' + iso(i + ' / ' + (frames.length - 1)) + '</p>';
+  }
+  o.addEventListener('click', ev => {
+    const k = ev.target.closest('[data-k]'); if (!k) return; const v = k.dataset.k;
+    if (v === 'x') { clearInterval(auto); closeOv(o); return; }
+    if (v === 'p') { if (auto) { clearInterval(auto); auto = null; k.textContent = '▶'; } else { k.textContent = '⏸'; auto = setInterval(() => { if (i < frames.length - 1) { i++; draw(); } else { clearInterval(auto); auto = null; k.textContent = '▶'; } }, 800); } return; }
+    i = v === '0' ? 0 : v === '9' ? frames.length - 1 : Math.max(0, Math.min(frames.length - 1, i + +v)); draw();
+  });
+  draw();
 }
 function bindRkb() {
   $('#hTable').addEventListener('click', e => {
@@ -4044,31 +4152,41 @@ const VARIANTS = [{ id: 'gin', name: 'gin', sub: 'ginSub' }, { id: 'hor', name: 
 
 function dayKey(d) { d = d || new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 function daySeed(k) { let h = 2166136261; for (const ch of 'rummynest-daily-' + k) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
-function dailyStreak() {
-  const D = LS.get('daily', {}); let n = 0, d = new Date();
-  if (!D[dayKey(d)] || !D[dayKey(d)].win) d.setDate(d.getDate() - 1);
-  while (D[dayKey(d)] && D[dayKey(d)].win) { n++; d.setDate(d.getDate() - 1); }
+const dVar = () => ['hor', 'rkb', 'gin'].includes(ST.variant) ? ST.variant : 'hor';
+function dKey(v, d) { return v === 'hor' ? dayKey(d) : v + ':' + dayKey(d); }   // רמי הורדות keeps its old keys
+function dailyStreak(v) {
+  v = v || dVar(); const D = LS.get('daily', {}); let n = 0, d = new Date();
+  if (!D[dKey(v, d)] || !D[dKey(v, d)].win) d.setDate(d.getDate() - 1);
+  while (D[dKey(v, d)] && D[dKey(v, d)].win) { n++; d.setDate(d.getDate() - 1); }
   return n;
 }
 function startDaily() {
-  const k = dayKey(), D = LS.get('daily', {});
-  const go = () => startHor({ mode: 'daily', players: 2, level: 2, pers: 'guard', seed: daySeed(k), dealer: 1, rules: { threshold: 30, jokers: 2, aceHigh: true, target: 1 }, daily: { key: k, official: !D[k] } });
+  const V = dVar(), k = dKey(V), D = LS.get('daily', {}), daily = { key: k, official: !D[k], v: V };
+  const go = () => {
+    if (V === 'gin') {
+      const M = GIN.newMatch({ seed: daySeed(k), dealer: 1, target: 1, bonuses: false, bigGin: false, names: ['', ''] });
+      G = { mode: 'daily', var: 'gin', level: 2, M, id: Date.now(), hints: 0, counted: {}, daily };
+      NEWC = null; SEL = null; saveGame(); show('game'); afterChange(true); return;
+    }
+    if (V === 'rkb') return startHor({ mode: 'daily', var: 'rkb', players: 2, level: 2, seed: daySeed(k), dealer: 1, rules: { threshold: 30, jokers: 2, target: 1 }, daily });
+    startHor({ mode: 'daily', players: 2, level: 2, pers: 'guard', seed: daySeed(k), dealer: 1, rules: { threshold: 30, jokers: 2, aceHigh: true, target: 1 }, daily });
+  };
   if (G && G.M && !G.M.over && G.mode !== 'online' && G.mode !== 'daily') confirmBox(T('replaceQ'), T('newGame'), go); else go();
 }
 function myTurns(log) { return log.filter(e => e[0] === 0 && (e[1] === 'draw' || e[1] === 'take')).length; }
 function dailyResult(v) {
   closeAllOv();
   const d = G.daily || {}, D = LS.get('daily', {}), rec = D[d.key] || {}, res = v.res, won = res.winner === 0;
-  const turns = myTurns(v.log), pts = won ? res.pts : -res.left[0], streak = dailyStreak();
-  const ov = overlay('<div style="font-size:54px;text-align:center">' + (won ? '🏆' : '📅') + '</div><h3 style="text-align:center">' + esc(won ? T('dWin') : res.winner == null ? T('rNoWinner') : T('dLose')) + '</h3>' +
+  const turns = myTurns(v.log), pts = won ? res.pts : -(res.left ? res.left[0] : res.pts || 0), streak = dailyStreak(d.v);
+  const ov = overlay('<div style="font-size:54px;text-align:center">' + (won ? '🏆' : '📅') + '</div><h3 style="text-align:center">' + esc(won ? T('dWin') : res.winner == null ? (v.g === 'gin' ? T('rDraw') : T('rNoWinner')) : T('dLose')) + '</h3>' +
     '<table class="tbl"><tr><td>' + esc(T('dTurns')) + '</td><td>' + turns + '</td></tr><tr><td>' + esc(T('points')) + '</td><td>' + iso((pts > 0 ? '+' : '') + pts) + '</td></tr>' + (G.hints ? '<tr><td>' + esc(T('hintsUsed', '')) + '</td><td>' + G.hints + '</td></tr>' : '') + '<tr><td>' + esc(T('dStreak')) + '</td><td>🔥 ' + streak + '</td></tr></table>' +
     '<p class="muted" style="text-align:center">' + esc(d.official ? T('dOfficial') : T('dRetry')) + (rec.turns != null && !d.official ? ' · ' + esc(T('dFirst', rec.win ? '✅' : '❌', rec.turns)) : '') + '</p>' +
     '<div class="row"><button class="btn" data-h>' + esc(T('home')) + '</button><button class="btn" data-t>👀 ' + esc(T('viewTable')) + '</button><button class="btn main" data-s>💬 ' + esc(T('dShare')) + '</button></div>', 'center');
   ov.querySelector('[data-h]').onclick = () => { closeOv(ov); leaveGame(); };
   ov.querySelector('[data-t]').onclick = () => { G.resSeen = true; closeOv(ov); renderGame(); };
   ov.querySelector('[data-s]').onclick = () => {
-    const r = D[d.key] || { win: won, turns, pts }, [y, m, dd] = d.key.split('-');
-    const txt = 'RummyNest · ' + T('daily') + ' ' + dd + '/' + m + '\n' + (r.win ? T('dShareWin', r.turns, r.pts) : T('dShareLose', r.turns)) + (streak > 1 ? '\n🔥 ' + T('dStreak') + ': ' + streak : '') + '\n' + location.origin + location.pathname;
+    const r = D[d.key] || { win: won, turns, pts }, [y, m, dd] = d.key.replace(/^\w+:/, '').split('-');
+    const txt = 'RummyNest · ' + T(d.v || 'hor') + ' · ' + T('daily') + ' ' + dd + '/' + m + '\n' + (r.win ? T('dShareWin', r.turns, r.pts) : T('dShareLose', r.turns)) + (streak > 1 ? '\n🔥 ' + T('dStreak') + ': ' + streak : '') + '\n' + location.origin + location.pathname;
     window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
   };
   if (won) { celebrate(true); beep('win'); } else beep('lose');
@@ -4080,8 +4198,8 @@ function renderHome() {
   $('#heroFan').innerHTML = fan;
   $('#vgrid').innerHTML = VARIANTS.map(x => '<button class="vcard ' + (ST.variant === x.id ? 'on' : '') + '" data-v="' + x.id + '"><b>' + esc(T(x.name)) + '</b><span>' + esc(T(x.sub)) + '</span></button>').join('');
   const c = $('#mCont'), g = G;
-  const dk = dayKey(), rec = LS.get('daily', {})[dk], st = dailyStreak();
-  $('#mDailySub').textContent = (rec ? (rec.win ? T('dDoneWin', rec.turns) : T('dDoneLose')) : T('dNotYet')) + (st ? ' · 🔥 ' + st : '');
+  const dk = dKey(dVar()), rec = LS.get('daily', {})[dk], st = dailyStreak();
+  $('#mDailySub').textContent = T(dVar()) + ' · ' + (rec ? (rec.win ? T('dDoneWin', rec.turns) : T('dDoneLose')) : T('dNotYet')) + (st ? ' · 🔥 ' + st : '');
   if (g && ((g.M && !g.M.over) || g.mode === 'online')) {
     c.classList.remove('hide');
     $('#mContSub').textContent = T(g.var || 'gin') + ' · ' + (g.mode === 'online' ? T('online') + (LINK && LINK.session ? ' · ' + LINK.session.code : '') : g.mode === 'two' ? T('twoPhone') : g.mode === 'daily' ? T('daily') : T('vsCpu') + ' · ' + T(LVL[g.level]));
@@ -4156,11 +4274,12 @@ function renderStats() {
 function renderReplays() {
   const R = LS.get('replays', []);
   if (!R.length) { $('#repBody').innerHTML = '<div class="card"><p>' + esc(T('noReplays')) + '</p></div>'; return; }
-  $('#repBody').innerHTML = R.map((r, i) => '<button class="card" data-i="' + i + '" style="width:100%;text-align:start;cursor:pointer;display:block"><b>' + esc(r.names.join(' – ')) + '</b><div class="muted">' + esc(new Date(r.d).toLocaleString(ST.lang)) + ' · ' + esc((r.var === 'hor' ? T('hor') + ' · ' : '') + (r.type === 'draw' || r.winner == null ? T('rDraw') : T('winsX', r.names[r.winner]) + ' +' + r.pts)) + '</div></button>').join('');
+  $('#repBody').innerHTML = R.map((r, i) => '<button class="card" data-i="' + i + '" style="width:100%;text-align:start;cursor:pointer;display:block"><b>' + esc(r.names.join(' – ')) + '</b><div class="muted">' + esc(new Date(r.d).toLocaleString(ST.lang)) + ' · ' + esc((r.var && r.var !== 'gin' ? T(r.var) + ' · ' : '') + (r.type === 'draw' || r.winner == null ? T('rDraw') : T('winsX', r.names[r.winner]) + ' +' + r.pts)) + '</div></button>').join('');
   $$('#repBody [data-i]').forEach(b => b.onclick = () => playReplay(R[+b.dataset.i]));
 }
 function playReplay(r) {
   if (r.var === 'hor') return horReplay(r);
+  if (r.var === 'rkb') return rkbReplay(r);
   const M = GIN.newMatch({ seed: r.seed, dealer: r.dealer, bigGin: r.bigGin, names: r.names, target: 9999 });
   const frames = [JSON.parse(JSON.stringify(M.H))];
   for (const [s, a, c] of r.log) {
@@ -4235,7 +4354,7 @@ function init() {
   $('#hReplays').onclick = () => { renderReplays(); show('replays'); };
   $('#hSettings').onclick = () => { renderSettings(); show('settings'); };
   $('#vgrid').onclick = e => { const b = e.target.closest('[data-v]'); if (b) { ST.variant = b.dataset.v; saveST(); renderHome(); } };
-  $('#mDaily').onclick = () => { if (G && G.mode === 'daily' && G.M && !G.M.over && G.daily && G.daily.key === dayKey()) { show('game'); afterChange(); return; } startDaily(); };
+  $('#mDaily').onclick = () => { if (G && G.mode === 'daily' && G.M && !G.M.over && G.daily && G.daily.key === dKey(dVar())) { show('game'); afterChange(); return; } startDaily(); };
   $('#mCpu').onclick = () => ST.variant !== 'gin' ? horSetup('cpu') : chooseLevel();
   $('#mTwo').onclick = () => ST.variant !== 'gin' ? horSetup('two') : askTwo();
   $('#mOnline').onclick = () => { if (G && G.mode === 'online') { show(G.M || G.v ? 'game' : 'lobby'); if (!G.M && !G.v) renderLobby(); } else openOnline(); };
