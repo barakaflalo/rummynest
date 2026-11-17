@@ -258,6 +258,14 @@ input.in,select.in{width:100%;min-height:48px;border-radius:12px;border:1.5px so
 .hstage .btn{min-height:40px;padding:4px 10px;color:var(--feltInk);border-color:var(--feltInk)}
 .hstage .btn.main{background:var(--acc);border-color:var(--acc);color:var(--accInk)}
 .pc.jk{color:#8a2be2}
+.hand .pc.canlay::after{content:"";position:absolute;top:calc(var(--w)*.06);right:calc(var(--w)*.08);width:12px;height:12px;border-radius:50%;background:#46d07a;box-shadow:0 0 0 2px #fff;animation:pulse 1.6s ease-in-out infinite}
+#confetti{position:fixed;inset:0;z-index:90;pointer-events:none}
+.big.pop{animation:bigpop .6s ease}
+@keyframes bigpop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.15);opacity:1}100%{transform:scale(1)}}
+.jwrap{position:relative;display:inline-block;line-height:0}
+.jrep{position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);background:#fff;color:#141414;border:1.5px solid currentColor;border-radius:10px;padding:1px 6px;font:700 12px/1.2 var(--body);white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.4);direction:ltr}
+.jrep.red{color:var(--red)}
+[data-skin="tiles"] .jrep.t0{color:var(--tBlk)}[data-skin="tiles"] .jrep.t1{color:var(--tRed)}[data-skin="tiles"] .jrep.t2{color:var(--tOra)}[data-skin="tiles"] .jrep.t3{color:var(--tBlu)}
 .pc.jk .jkf{position:absolute;inset:0;display:grid;place-items:center;font-size:calc(var(--w)*.6)}
 [data-skin="tiles"] .pc.jk .jkf{display:none}
 [data-skin="tiles"] .pc.jk{color:#c4262e}
@@ -341,6 +349,7 @@ input.in,select.in{width:100%;min-height:48px;border-radius:12px;border:1.5px so
   </div>
   <div class="gbar" id="gbar">
     <button class="btn sm" id="bHint" aria-label="hint">💡</button>
+    <button class="btn sm hide" id="bUndo" aria-label="undo">↶</button>
     <button class="btn" id="bA"></button>
     <button class="btn main" id="bB"></button>
   </div>
@@ -1007,7 +1016,7 @@ const HOR = (() => {
   const DEF = { threshold: 30, jokers: 2, aceHigh: true, target: 300, hand: 14 };
 
   /* ---------- a meld on its own: is it legal, what does each joker stand for, what is it worth ---------- */
-  function validMeld(cards, aceHigh) {
+  function validMeld(cards, aceHigh, low) {
     if (!cards || cards.length < 3) return null;
     const nat = cards.filter(c => !isJ(c)), jk = cards.filter(isJ);
     if (nat.length < 2) return null;
@@ -1031,8 +1040,8 @@ const HOR = (() => {
       if (gaps > jk.length) continue;
       let extra = jk.length - gaps, lo = lo0, hi = hi0;
       const top = lo0 === 1 ? 13 : (aceHigh ? 14 : 13), bot = hi0 === 14 ? 2 : 1;
-      while (extra > 0 && hi < top) { hi++; extra--; }
-      while (extra > 0 && lo > bot) { lo--; extra--; }
+      if (low) { while (extra > 0 && lo > bot) { lo--; extra--; } while (extra > 0 && hi < top) { hi++; extra--; } }
+      else { while (extra > 0 && hi < top) { hi++; extra--; } while (extra > 0 && lo > bot) { lo--; extra--; } }
       if (extra > 0 || hi - lo + 1 > 13) continue;
       const order = [], jr = {}, jq = jk.slice(), byPos = {};
       nat.forEach((c, i) => byPos[pos[i]] = c);
@@ -1059,6 +1068,17 @@ const HOR = (() => {
     if (r === 1 && m.hi === 13 && aceHigh && m.lo > 1) return { at: 'hi' };
     if (r === m.lo - 1 && m.lo - 1 >= bot) return { at: 'lo' };
     return null;
+  }
+  function layEnds(m, c, aceHigh) {
+    if (m.type === 'set') { const f = fitLay(m, c, aceHigh); return f ? ['end'] : []; }
+    if (m.hi - m.lo + 1 >= 13) return [];
+    const top = m.lo === 1 ? 13 : (aceHigh ? 14 : 13), bot = m.hi === 14 ? 2 : 1, out = [];
+    if (isJ(c)) { if (m.lo > bot) out.push('lo'); if (m.hi < top) out.push('hi'); return out; }
+    if (su(c) !== m.suit) return out;
+    const r = rk(c);
+    if (r === m.lo - 1 && m.lo - 1 >= bot) out.push('lo');
+    if ((r === m.hi + 1 && r !== 1 && m.hi + 1 <= top) || (r === 1 && m.hi === 13 && aceHigh && m.lo > 1)) out.push('hi');
+    return out;
   }
   function doLay(m, c, at) {
     if (m.type === 'set') {
@@ -1164,6 +1184,7 @@ const HOR = (() => {
     switch (a.a) {
       case 'draw': return R.phase === 'draw';
       case 'take': return R.phase === 'draw' && R.discard.length > 0;
+      case 'undo': return R.phase === 'play' && !!R.snap && R.log.length > R.snap.logLen;
       case 'open': {
         if (R.phase !== 'play' || R.opened[s] || !Array.isArray(a.melds) || !a.melds.length) return false;
         const all = [].concat(...a.melds); if (!has(hand, all)) return false;
@@ -1171,7 +1192,7 @@ const HOR = (() => {
         return v >= M.threshold;
       }
       case 'meld': return R.phase === 'play' && R.opened[s] && has(hand, a.cards || []) && !!validMeld(a.cards, M.aceHigh);
-      case 'lay': return R.phase === 'play' && R.opened[s] && hand.includes(a.c) && R.table[a.m] && !!fitLay(R.table[a.m], a.c, M.aceHigh);
+      case 'lay': { if (R.phase !== 'play' || !R.opened[s] || !hand.includes(a.c) || !R.table[a.m]) return false; const e = layEnds(R.table[a.m], a.c, M.aceHigh); return a.at ? e.includes(a.at) : e.length > 0; }
       case 'swap': {
         if (R.phase !== 'play' || !R.opened[s] || !hand.includes(a.c) || !R.table[a.m]) return false;
         const j = swapFit(R.table[a.m], a.c); return j != null;
@@ -1194,23 +1215,26 @@ const HOR = (() => {
         if (R.reshuffled >= 1 || R.discard.length < 2) { R.log.push([s, 'draw', null]); endRound(M, null); return true; }
         const t = R.discard.pop(); R.stock = RCx.shuffle(R.discard, RCx.rng(R.seed + 17)); R.discard = [t]; R.reshuffled++;
       }
-      const c = R.stock.pop(); hand.push(c); R.took = c; R.tookFrom = 's'; R.phase = 'play'; R.log.push([s, 'draw', null]);
+      const c = R.stock.pop(); hand.push(c); R.took = c; R.tookFrom = 's'; R.phase = 'play'; R.log.push([s, 'draw', null]); R.snap = JSON.parse(JSON.stringify({ table: R.table, hand, opened: R.opened[s], must: R.must, logLen: R.log.length }));
     } else if (a.a === 'take') {
-      const c = R.discard.pop(); hand.push(c); R.took = c; R.tookFrom = 'd'; R.phase = 'play'; R.picked[s].push(c); R.log.push([s, 'take', c]);
+      const c = R.discard.pop(); hand.push(c); R.took = c; R.tookFrom = 'd'; R.phase = 'play'; R.picked[s].push(c); R.log.push([s, 'take', c]); R.snap = JSON.parse(JSON.stringify({ table: R.table, hand, opened: R.opened[s], must: R.must, logLen: R.log.length }));
     } else if (a.a === 'open') {
-      for (const m of a.melds) { const vm = validMeld(m, M.aceHigh); del(hand, m); R.table.push(Object.assign(vm, { owner: s })); }
-      R.opened[s] = true; R.log.push([s, 'open', a.melds.map(m => m.slice())]);
+      a.melds.forEach((m, i) => { const vm = validMeld(m, M.aceHigh, a.lows && a.lows[i]); del(hand, m); R.table.push(Object.assign(vm, { owner: s })); });
+      R.opened[s] = true; R.log.push([s, 'open', a.melds.map(m => m.slice()), a.lows || null]);
     } else if (a.a === 'meld') {
-      const vm = validMeld(a.cards, M.aceHigh); del(hand, a.cards); R.table.push(Object.assign(vm, { owner: s })); R.must = R.must.filter(j => !a.cards.includes(j)); R.log.push([s, 'meld', a.cards.slice()]);
+      const vm = validMeld(a.cards, M.aceHigh, a.low); del(hand, a.cards); R.table.push(Object.assign(vm, { owner: s })); R.must = R.must.filter(j => !a.cards.includes(j)); R.log.push([s, 'meld', a.cards.slice(), !!a.low]);
     } else if (a.a === 'lay') {
-      const m = R.table[a.m], f = fitLay(m, a.c, M.aceHigh); del(hand, [a.c]); doLay(m, a.c, f.at); R.must = R.must.filter(j => j !== a.c); R.log.push([s, 'lay', a.c, a.m]);
+      const m = R.table[a.m], ends = layEnds(m, a.c, M.aceHigh), at = a.at || (ends.includes('hi') ? 'hi' : ends[0]); del(hand, [a.c]); doLay(m, a.c, at); R.must = R.must.filter(j => j !== a.c); R.log.push([s, 'lay', a.c, a.m, at]);
     } else if (a.a === 'swap') {
       const m = R.table[a.m], j = swapFit(m, a.c), i = m.cards.indexOf(j);
       m.cards[i] = a.c; delete m.jr[j]; del(hand, [a.c]); hand.push(j); R.must.push(j);
       if (m.type === 'set') { const natS = m.cards.filter(x => !isJ(x)).map(su), miss = [0, 1, 2, 3].filter(q => !natS.includes(q)); let k = 0; m.cards.filter(isJ).forEach(x => m.jr[x] = { r: m.rank, s: miss[k++] }); }
       R.log.push([s, 'swap', a.c, a.m, j]);
+    } else if (a.a === 'undo') {
+      const S = R.snap; R.table = S.table; R.hands[s] = S.hand; R.opened[s] = S.opened; R.must = S.must; R.log.length = S.logLen;
+      R.snap = JSON.parse(JSON.stringify(S)); return true;
     } else if (a.a === 'discard') {
-      del(hand, [a.c]); R.discard.push(a.c); R.log.push([s, 'discard', a.c]); R.turns++; R.took = null; R.must = [];
+      del(hand, [a.c]); R.discard.push(a.c); R.log.push([s, 'discard', a.c]); R.turns++; R.took = null; R.must = []; R.snap = null;
       if (!hand.length) endRound(M, s);
       else { R.turn = (s + 1) % M.n; R.phase = 'draw'; }
     }
@@ -1234,7 +1258,7 @@ const HOR = (() => {
     const R = M.R, end = R.phase === 'end';
     return {
       g: 'hor', seat: s, n: M.n, names: M.names, scores: M.scores, wins: M.wins, target: M.target, threshold: M.threshold, aceHigh: M.aceHigh, jokers: M.jokers,
-      roundNo: M.roundNo, dealer: R.dealer, turn: R.turn, phase: R.phase, took: R.turn === s ? R.took : null, tookFrom: R.turn === s ? R.tookFrom : null, must: R.turn === s ? R.must.slice() : [],
+      roundNo: M.roundNo, dealer: R.dealer, turn: R.turn, phase: R.phase, canUndo: R.turn === s && R.phase === 'play' && !!R.snap && R.log.length > R.snap.logLen, took: R.turn === s ? R.took : null, tookFrom: R.turn === s ? R.tookFrom : null, must: R.turn === s ? R.must.slice() : [],
       hand: R.hands[s].slice(), counts: R.hands.map(h => h.length), hands: end ? R.hands.map(h => h.slice()) : null,
       table: R.table.map(m => ({ type: m.type, cards: m.cards.slice(), jr: Object.assign({}, m.jr), owner: m.owner, rank: m.rank, suit: m.suit, lo: m.lo, hi: m.hi })),
       opened: R.opened.slice(), discard: R.discard.slice(), up: R.up, stockCount: R.stock.length, picked: R.picked.map(p => p.slice()),
@@ -1343,7 +1367,13 @@ const HOR = (() => {
       for (const c of order) {
         if (isJ(c) && !must.includes(c) && L.keepJ && hand.length > 3) continue;
         if (!must.includes(c) && rnd() > L.layP) continue;
-        for (let mi = 0; mi < v.table.length; mi++) if (fitLay(v.table[mi], c, v.aceHigh)) return { a: 'lay', c, m: mi };
+        for (let mi = 0; mi < v.table.length; mi++) {
+          const ends = layEnds(v.table[mi], c, v.aceHigh); if (!ends.length) continue;
+          if (ends.length < 2) return { a: 'lay', c, m: mi, at: ends[0] };
+          let best = ends[0], bs = -1;
+          for (const at of ends) { const T2 = asT(v); doLay(T2[mi], c, at); const sc = hand.filter(x => x !== c && T2.some(mm => fitLay(mm, x, v.aceHigh))).reduce((t, x) => t + pen(x), 0) + (at === 'lo' ? .1 : 0); if (sc > bs) { bs = sc; best = at; } }
+          return { a: 'lay', c, m: mi, at: best };
+        }
       }
     }
     // 5) throw: the loose card I least want, never a joker
@@ -1381,7 +1411,7 @@ const HOR = (() => {
     if (L.noise && rnd() < L.noise) return { a: 'discard', c: scored[Math.floor(rnd() * Math.min(3, scored.length))].c };
     return { a: 'discard', c: scored[0].c };
   }
-  return { newMatch, deal, nextRound, legal, apply, view, act, plan, validMeld, fitLay, swapFit, isJ, pen, LV, DEF };
+  return { newMatch, deal, nextRound, legal, apply, view, act, plan, validMeld, fitLay, layEnds, swapFit, isJ, pen, LV, DEF };
 })();
 
 
@@ -1793,6 +1823,12 @@ rulesHtml:"<h3>الهدف</h3><p>لاعبان. رتّب أوراقك العشر 
 
 /* ---- i18n/hor_he.js ---- */
 Object.assign(LANG.he, {
+undone:"בוטל — חזרת לתחילת התור",
+canLayN:"{0} מהקלפים שלך נכנסים לשולחן (מסומנים בירוק) · חוסך {1} נקודות",
+savesN:"חוסך {0} נקודות",
+whereJ:"איפה לשים?",
+atStart:"בהתחלה · {0}",
+atEnd:"בסוף · {0}",
 goOut:"הורד הכל וסיים! 🏁",
 upTo4:"עד 4 שחקנים בחדר. אפשר להשלים מקומות במחשבים.",
 addCpus:"להוסיף מחשבים",
@@ -1816,6 +1852,12 @@ rulesHorHtml:"<h2>רמי הורדות</h2><h3>הכנה</h3><p>2–4 שחקנים
 
 /* ---- i18n/hor_en.js ---- */
 Object.assign(LANG.en, {
+undone:"Undone — back to the start of your turn",
+canLayN:"{0} of your cards fit the table (green dot) · saves {1} points",
+savesN:"saves {0} points",
+whereJ:"Where should it go?",
+atStart:"At the start · {0}",
+atEnd:"At the end · {0}",
 goOut:"Lay down all and win! 🏁",
 upTo4:"Up to 4 players. Empty seats can be filled with computers.",
 addCpus:"Add computers",
@@ -1839,6 +1881,12 @@ rulesHorHtml:"<h2>Rummy with a first meld</h2><h3>Setup</h3><p>2–4 players, tw
 
 /* ---- i18n/hor_ru.js ---- */
 Object.assign(LANG.ru, {
+undone:"Отменено — вы в начале хода",
+canLayN:"{0} ваших карт подходят к столу (зелёная точка) · экономия {1} очков",
+savesN:"экономия {0} очков",
+whereJ:"Куда положить?",
+atStart:"В начало · {0}",
+atEnd:"В конец · {0}",
 goOut:"Выложить всё и выйти! 🏁",
 upTo4:"До 4 игроков. Свободные места можно занять компьютерами.", addCpus:"Добавить компьютеры", gameRunning:"Игра уже идёт — вы войдёте в следующую", waTextHor:"Сыграем в рамми в RummyNest! Код комнаты: {0}", cpusN:"компьютеров: {0}", handPts:"Очки в руке",
 hor:"Рамми (выкладка 30)", horSub:"2–4 игрока · 14 карт · первая выкладка 30",
@@ -1857,6 +1905,12 @@ rulesHorHtml:"<h2>Рамми с первой выкладкой</h2><h3>Подг
 
 /* ---- i18n/hor_es.js ---- */
 Object.assign(LANG.es, {
+undone:"Deshecho: vuelves al inicio del turno",
+canLayN:"{0} de tus cartas encajan en la mesa (punto verde) · ahorras {1} puntos",
+savesN:"ahorras {0} puntos",
+whereJ:"¿Dónde lo pones?",
+atStart:"Al principio · {0}",
+atEnd:"Al final · {0}",
 goOut:"¡Bajar todo y cerrar! 🏁",
 upTo4:"Hasta 4 jugadores. Los huecos se pueden llenar con el ordenador.", addCpus:"Añadir ordenadores", gameRunning:"La partida ya empezó: entrarás en la siguiente", waTextHor:"¡Juega al rummy conmigo en RummyNest! Código de sala: {0}", cpusN:"{0} ordenadores", handPts:"Puntos en mano",
 hor:"Rummy (bajada 30)", horSub:"2–4 jugadores · 14 cartas · primera bajada de 30",
@@ -1875,6 +1929,12 @@ rulesHorHtml:"<h2>Rummy con primera bajada</h2><h3>Preparación</h3><p>2–4 jug
 
 /* ---- i18n/hor_ar.js ---- */
 Object.assign(LANG.ar, {
+undone:"تم التراجع — عدت إلى بداية دورك",
+canLayN:"{0} من أوراقك تناسب الطاولة (نقطة خضراء) · توفر {1} نقاط",
+savesN:"توفر {0} نقاط",
+whereJ:"أين تضعها؟",
+atStart:"في البداية · {0}",
+atEnd:"في النهاية · {0}",
 goOut:"نزّل الكل وأنهِ! 🏁",
 upTo4:"حتى 4 لاعبين. يمكن ملء المقاعد الفارغة بالكمبيوتر.", addCpus:"إضافة كمبيوتر", gameRunning:"بدأت اللعبة — ستنضم إلى التالية", waTextHor:"تعال العب معي رامي في RummyNest! رمز الغرفة: {0}", cpusN:"{0} كمبيوتر", handPts:"نقاط في اليد",
 hor:"رامي (تنزيل 30)", horSub:"2–4 لاعبين · 14 ورقة · أول تنزيل 30",
@@ -1895,7 +1955,7 @@ rulesHorHtml:"<h2>رامي بتنزيل أول</h2><h3>التحضير</h3><p>2�
 /* =====================================================================
    RummyNest — app core (storage · settings · screens · cards · sound)
    ===================================================================== */
-const APP_VERSION = '1.1.1';
+const APP_VERSION = '1.2.0';
 const $ = s => document.querySelector(s), $$ = s => Array.from(document.querySelectorAll(s));
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const P = 'rummy_';
@@ -1992,6 +2052,27 @@ function cardTxt(c) {
 function cardName(c) {
   if (c >= 104) return T('joker'); return ST.skin === 'tiles' ? RC.rank(c) + ' ' + T(TCOL[RC.suit(c)]) : RL[RC.rank(c)] + SUITS[RC.suit(c)]; }
 
+/* confetti + a number counting up — the winner's moment */
+function celebrate(big) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches || /[?&]fast=1/.test(location.search)) return;
+  let cv = $('#confetti'); if (cv) cv.remove();
+  cv = document.createElement('canvas'); cv.id = 'confetti'; document.body.appendChild(cv);
+  const dpr = Math.min(2, devicePixelRatio || 1), W = cv.width = innerWidth * dpr, H = cv.height = innerHeight * dpr, x = cv.getContext('2d');
+  const cols = ['#f0cd6e', '#e0566a', '#4aa8e8', '#3fbf7f', '#ffffff', '#e07a10'], N = big ? 220 : 120;
+  const P = Array.from({ length: N }, () => ({ x: W / 2 + (Math.random() - .5) * W * .3, y: H * .45, vx: (Math.random() - .5) * 16 * dpr, vy: (-8 - Math.random() * 12) * dpr, r: (4 + Math.random() * 5) * dpr, a: Math.random() * 6, va: (Math.random() - .5) * .4, c: cols[Math.floor(Math.random() * cols.length)] }));
+  const t0 = performance.now(), dur = big ? 3200 : 2200;
+  (function step(t) {
+    const k = (t - t0) / dur; if (k > 1 || !cv.isConnected) { cv.remove(); return; }
+    x.clearRect(0, 0, W, H); x.globalAlpha = Math.min(1, (1 - k) * 2.5);
+    for (const p of P) { p.vy += .45 * dpr; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.a += p.va; x.save(); x.translate(p.x, p.y); x.rotate(p.a); x.fillStyle = p.c; x.fillRect(-p.r, -p.r / 2, p.r * 2, p.r); x.restore(); }
+    requestAnimationFrame(step);
+  })(t0);
+}
+function countUp(el, to, prefix) {
+  if (!el) return; const t0 = performance.now(), d = 900;
+  el.classList.add('pop');
+  (function step(t) { const k = Math.min(1, (t - t0) / d), v = Math.round(to * (1 - Math.pow(1 - k, 3))); el.textContent = prefix + iso('+' + v); if (k < 1) requestAnimationFrame(step); })(t0);
+}
 /* runs that touch (4-5-6 + 7-8-9 of one suit) are shown as one run */
 function mergeRuns(melds) {
   const out = melds.map(m => m.slice());
@@ -2325,7 +2406,7 @@ function renderGame() {
     if (SEL != null && SEL === v.took) msg.textContent = T('noThrowBack');
   }
   if (hidden) { setBtn(A, '…', false); setBtn(B, '…', false, 'main'); }
-  $('#bHint').disabled = !myTurn || hidden || G.mode === 'online';
+  $('#bHint').disabled = !myTurn || hidden || G.mode === 'online'; $('#bUndo').classList.add('hide');
   $('#bHint').classList.toggle('hide', G.mode === 'online');
   renderNet();
   // overlays that belong to the state
@@ -2494,8 +2575,10 @@ function showResult(v) {
   ov.querySelector('[data-x]').onclick = () => { G.resSeen = true; closeOv(ov); renderGame(); };
   ov.querySelector('[data-n]').onclick = () => { if (v.over) { closeOv(ov); showFinal(v); } else nextHandAsk(ov); };
   renderReadyLine();
+  if (res.type !== 'draw' && (res.winner === s || G.mode === 'two') && !G.cheered) { G.cheered = true; celebrate(res.type !== 'knock'); }
 }
 function nextHandAsk(ov) {
+  G.cheered = false;
   if (G.mode === 'online') { netReady(); return; }
   closeAllOv(); G.resSeen = false;
   GIN.nextHand(G.M); NEWC = null; SEL = null; G.viewer = null;
@@ -2522,6 +2605,7 @@ function showFinal(v) {
   ov.querySelector('[data-h]').onclick = () => { closeOv(ov); leaveGame(); };
   ov.querySelector('[data-r]').onclick = () => { if (G.mode === 'online') { netReady(); return; } closeOv(ov); rematch(); };
   renderReadyLine();
+  if (won || G.mode === 'two') celebrate(true);
 }
 function rematch() {
   const M0 = G.M;
@@ -2607,6 +2691,13 @@ function horArrange(hand, v) {
   const loose = p.loose.slice().sort((a, b) => (HOR.isJ(a) ? 99 : RC.rank(a)) - (HOR.isJ(b) ? 99 : RC.rank(b)) || a - b);
   return { groups: ms.concat(loose.length ? [loose] : []), melded, meldCount: ms.length };
 }
+let LAYABLE = new Set();
+function layableOf(v) {      // my cards that can go onto a meld on the table right now (lay or joker swap)
+  const out = new Set();
+  if (v.turn !== v.seat || v.phase !== 'play' || !v.opened[v.seat]) return out;
+  for (const c of v.hand) if (v.table.some(m => HOR.layEnds(m, c, v.aceHigh).length || HOR.swapFit(m, c) != null)) out.add(c);
+  return out;
+}
 function horLayoutHand(v) {
   const el = $('#hand'), A = horArrange(v.hand, v), n = A.groups.reduce((t, g) => t + g.length, 0);
   const W = Math.min(el.parentNode.clientWidth - 8, 640);
@@ -2618,7 +2709,7 @@ function horLayoutHand(v) {
   let x = 0, html = '';
   A.groups.forEach((g, gi) => {
     const x0 = x;
-    g.forEach(c => { html += cardHTML(c, (SELS.includes(c) ? 'sel ' : '') + (c === NEWC ? 'new ' : '') + (v.must.includes(c) ? 'must' : ''), 'style="--w:' + cw + 'px;left:' + x.toFixed(1) + 'px" tabindex="0" role="button"'); x += step; });
+    g.forEach(c => { html += cardHTML(c, (SELS.includes(c) ? 'sel ' : '') + (c === NEWC ? 'new ' : '') + (v.must.includes(c) ? 'must ' : '') + (LAYABLE.has(c) ? 'canlay' : ''), 'style="--w:' + cw + 'px;left:' + x.toFixed(1) + 'px" tabindex="0" role="button"'); x += step; });
     if (ST.sort === 'melds' && gi < (A.meldCount || 0)) html += '<span class="grp" style="left:' + x0.toFixed(1) + 'px;width:' + (x - step - x0 + cw).toFixed(1) + 'px"></span>';
     x += gap;
   });
@@ -2647,7 +2738,7 @@ function renderHor() {
   const mw = Math.max(26, Math.min(34, Math.round(($('#game').clientWidth || 400) / 13)));
   $('#hTable').innerHTML = v.table.length ? v.table.map((m, i) => {
     const fit = canLay && one != null && (HOR.fitLay(m, one, v.aceHigh) || HOR.swapFit(m, one) != null);
-    return '<button class="hmeld ' + (fit ? 'fit' : '') + '" data-m="' + i + '" aria-label="' + esc(T('meldOf', horName(v, m.owner))) + '"><span class="own" style="background:' + SEATC[m.owner] + '"></span>' + m.cards.map(c => cardHTML(c, '', 'style="--w:' + mw + 'px"')).join('') + '</button>';
+    return '<button class="hmeld ' + (fit ? 'fit' : '') + '" data-m="' + i + '" aria-label="' + esc(T('meldOf', horName(v, m.owner))) + '"><span class="own" style="background:' + SEATC[m.owner] + '"></span>' + m.cards.map(c => jkCard(c, m.jr, mw)).join('') + '</button>';
   }).join('') : '<div class="muted hempty">' + esc(T('tableEmpty')) + '</div>';
   // piles
   const pw = Math.max(46, Math.min(64, Math.round(($('#game').clientWidth || 400) / 7)));
@@ -2660,6 +2751,7 @@ function renderHor() {
   $('#pStock').classList.toggle('can', myTurn && v.phase === 'draw' && !hidden);
   // hand
   SELS = SELS.filter(c => v.hand.includes(c)); STAGE = STAGE.filter(m => m.every(c => v.hand.includes(c)));
+  LAYABLE = hidden ? new Set() : layableOf(v);
   if (hidden) $('#hand').innerHTML = ''; else horLayoutHand(v);
   const p = HOR.plan(v.hand, v.aceHigh, 'dw');
   $('#myDw').textContent = hidden ? '–' : p.v; $('.dwline [data-t]').textContent = T('handPts');
@@ -2669,9 +2761,9 @@ function renderHor() {
   // stage bar (building the opening)
   const sb = $('#hStage');
   if (STAGE.length && myTurn && !hidden) {
-    const tot = STAGE.reduce((t, m) => t + HOR.validMeld(m, v.aceHigh).value, 0);
+    const tot = STAGE.reduce((t, m) => t + HOR.validMeld(m, v.aceHigh, m.low).value, 0);
     sb.classList.remove('hide');
-    sb.innerHTML = '<div class="stg">' + STAGE.map((m, i) => '<button class="hmeld" data-st="' + i + '">' + HOR.validMeld(m, v.aceHigh).cards.map(c => cardHTML(c, '', 'style="--w:28px"')).join('') + '</button>').join('') + '</div><div class="row" style="align-items:center"><b>' + iso(tot + ' / ' + v.threshold) + '</b><button class="btn" id="stCancel">✕ ' + esc(T('cancel')) + '</button><button class="btn main" id="stOpen" ' + (tot >= v.threshold ? '' : 'disabled') + '>✓ ' + esc(T('openNow')) + '</button></div>';
+    sb.innerHTML = '<div class="stg">' + STAGE.map((m, i) => '<button class="hmeld" data-st="' + i + '">' + (x => x.cards.map(c => jkCard(c, x.jr, 28)).join(''))(HOR.validMeld(m, v.aceHigh, m.low)) + '</button>').join('') + '</div><div class="row" style="align-items:center"><b>' + iso(tot + ' / ' + v.threshold) + '</b><button class="btn" id="stCancel">✕ ' + esc(T('cancel')) + '</button><button class="btn main" id="stOpen" ' + (tot >= v.threshold ? '' : 'disabled') + '>✓ ' + esc(T('openNow')) + '</button></div>';
   } else { sb.classList.add('hide'); sb.innerHTML = ''; }
   // message + buttons
   const msg = $('#gMsg'), A = $('#bA'), B = $('#bB');
@@ -2681,7 +2773,8 @@ function renderHor() {
   else if (v.phase === 'draw') { msg.textContent = T('drawMsg'); setBtn(A, T('fromStock'), true, 'main'); setBtn(B, tp != null ? T('takeX', cardTxt(tp)) : T('discardPile'), tp != null); }
   else {
     const mustLeft = v.must.filter(c => v.hand.includes(c));
-    msg.textContent = mustLeft.length ? T('mustUseJ') : !v.opened[s] ? T('openMsg', v.threshold) : T('playMsg');
+    const lp = [...LAYABLE].reduce((t, c) => t + HOR.pen(c), 0);
+    msg.textContent = mustLeft.length ? T('mustUseJ') : !v.opened[s] ? T('openMsg', v.threshold) : LAYABLE.size && !SELS.length ? T('canLayN', LAYABLE.size, lp) : T('playMsg');
     if (!v.opened[s]) setBtn(A, selMeld ? T('addToOpen', selMeld.value) : T('buildMeld'), !!selMeld, selMeld ? 'hot' : '');
     else setBtn(A, selMeld ? (SELS.length === v.hand.length ? T('goOut') : T('putMeld', selMeld.value)) : T('buildMeld'), !!selMeld, selMeld ? 'hot' : '');
     const thOk = isGuest() ? one != null && !mustLeft.length && !(one === v.took && v.tookFrom === 'd' && v.hand.length > 1) : one != null && HOR.legal(G.M, s, { a: 'discard', c: one });
@@ -2690,6 +2783,7 @@ function renderHor() {
   }
   if (hidden) { setBtn(A, '…', false); setBtn(B, '…', false, 'main'); }
   $('#bHint').disabled = !myTurn || hidden; $('#bHint').classList.toggle('hide', G.mode === 'online');
+  $('#bUndo').classList.toggle('hide', !(myTurn && v.phase === 'play' && !hidden)); $('#bUndo').disabled = !v.canUndo;
   renderNet();
   if (hidden) showPass(v); else hidePass();
   if (v.phase === 'end' && !$('#ovs .ov') && !G.resSeen) horResult(v);
@@ -2720,7 +2814,7 @@ function horDo(a) {
   if (a.a === 'draw') fly($('#pStock'), $('#hand'), null, true); else if (a.a === 'take') fly($('#pDisc'), $('#hand'), v.discard[v.discard.length - 1]);
   else if (a.a === 'discard') fly($('#hand .pc[data-c="' + a.c + '"]'), $('#pDisc'), a.c);
   const before = v.hand.slice();
-  HOR.apply(G.M, v.seat, a); beep(a.a === 'open' ? 'knock' : 'card'); buzz(12);
+  HOR.apply(G.M, v.seat, a); beep(a.a === 'open' ? 'knock' : a.a === 'undo' ? 'turn' : 'card'); buzz(12);
   const after = HOR.view(G.M, v.seat).hand;
   NEWC = a.a === 'draw' || a.a === 'take' ? after.find(c => !before.includes(c)) : a.a === 'swap' ? after.find(c => HOR.isJ(c) && !before.includes(c)) : null;
   SELS = a.a === 'swap' ? [NEWC] : [];
@@ -2728,15 +2822,32 @@ function horDo(a) {
   G.last = { s: v.seat, a: a.a };
   afterChange();
 }
+/* a joker on the table carries a small badge with the card it stands for */
+function jkCard(c, jr, w) {
+  const h = cardHTML(c, '', 'style="--w:' + w + 'px"');
+  if (!HOR.isJ(c) || !jr || !jr[c]) return h;
+  const rep = jr[c].s * 13 + jr[c].r - 1;
+  return '<span class="jwrap">' + h + '<b class="jrep t' + jr[c].s + (jr[c].s === 1 || jr[c].s === 2 ? ' red' : '') + '">' + esc(ST.skin === 'tiles' ? String(jr[c].r) : RL[jr[c].r] + SUITS[jr[c].s]) + '</b></span>';
+}
+/* what a card would become at each end of a run (for the choice buttons) */
+function endLabel(m, at, c) {
+  if (m.type !== 'run') return '';
+  const p = at === 'lo' ? m.lo - 1 : m.hi + 1, r = p === 14 ? 1 : p;
+  return cardTxt(m.suit * 13 + r - 1);
+}
+function askEnd(title, opts, cb) {
+  const o = overlay('<h3>' + esc(title) + '</h3><div class="row" dir="ltr" style="margin-top:8px">' + opts.map((x, i) => '<button class="btn ' + (i ? 'main' : '') + '" data-e="' + i + '" style="min-height:64px;font-size:18px">' + esc(x.label) + '</button>').join('') + '</div><div class="row" style="margin-top:8px"><button class="btn ghosty" data-c>' + esc(T('cancel')) + '</button></div>', 'center');
+  o.addEventListener('click', e => { const b = e.target.closest('[data-e]'); if (b) { closeOv(o); cb(opts[+b.dataset.e].v); } else if (e.target.closest('[data-c]')) closeOv(o); });
+}
 function horTapMeld(i) {
   const v = curView(); if (!v || v.turn !== v.seat || v.phase !== 'play') { toast(T('meldTapHint')); return; }
   if (!v.opened[v.seat]) { toast(T('openFirst', v.threshold)); return; }
   if (SELS.length !== 1) { toast(T('meldTapHint')); return; }
   const c = SELS[0], m = v.table[i];
   if (HOR.swapFit(m, c) != null) return horDo({ a: 'swap', c, m: i });
-  if (HOR.fitLay(m, c, v.aceHigh)) {
-    return horDo({ a: 'lay', c, m: i });
-  }
+  const ends = HOR.layEnds(m, c, v.aceHigh);
+  if (ends.length === 1) return horDo({ a: 'lay', c, m: i, at: ends[0] });
+  if (ends.length > 1) return askEnd(T('whereJ'), [{ v: 'lo', label: '⬅ ' + T('atStart', endLabel(m, 'lo')) }, { v: 'hi', label: T('atEnd', endLabel(m, 'hi')) + ' ➡' }], at => horDo({ a: 'lay', c, m: i, at }));
   beep('err'); toast(T('noFit', cardTxt(c)));
 }
 function horBtnA() {
@@ -2745,10 +2856,16 @@ function horBtnA() {
   if (v.turn !== v.seat) return;
   if (v.phase === 'draw') return horDo({ a: 'draw' });
   const vm = SELS.length >= 3 ? HOR.validMeld(SELS, v.aceHigh) : null; if (!vm) return;
-  if (!v.opened[v.seat]) {
-    STAGE.push(SELS.slice()); SELS = []; beep('card'); renderGame(); return;
+  const go = low => {
+    if (!v.opened[v.seat]) { const m = SELS.slice(); m.low = low; STAGE.push(m); SELS = []; beep('card'); renderGame(); return; }
+    horDo({ a: 'meld', cards: SELS.slice(), low });
+  };
+  const vl = HOR.validMeld(SELS, v.aceHigh, true);
+  if (vm.type === 'run' && vl && vl.lo !== vm.lo) {
+    const lab = m => cardTxt(m.suit * 13 + (m.lo === 14 ? 1 : m.lo) - 1) + ' – ' + cardTxt(m.suit * 13 + (m.hi === 14 ? 1 : m.hi) - 1);
+    return askEnd(T('whereJ'), [{ v: true, label: lab(vl) }, { v: false, label: lab(vm) }], go);
   }
-  horDo({ a: 'meld', cards: SELS.slice() });
+  go(false);
 }
 function horBtnB() {
   const v = curView(); if (!v) return;
@@ -2770,7 +2887,7 @@ function horHint() {
   if (a.a === 'draw') t = T('hDraw'); else if (a.a === 'take') t = T('hTake', cardTxt(v.discard[v.discard.length - 1]));
   else if (a.a === 'open') { STAGE = a.melds.map(m => m.slice()); SELS = []; t = T('hOpen', a.melds.reduce((x, m) => x + HOR.validMeld(m, v.aceHigh).value, 0)); }
   else if (a.a === 'meld') { SELS = a.cards.slice(); t = T('hMeld'); }
-  else if (a.a === 'lay') { SELS = [a.c]; t = T('hLay', cardTxt(a.c)); }
+  else if (a.a === 'lay') { SELS = [a.c]; t = T('hLay', cardTxt(a.c)) + ' · ' + T('savesN', HOR.pen(a.c)); }
   else if (a.a === 'swap') { SELS = [a.c]; t = T('hSwap', cardTxt(a.c)); }
   else if (a.a === 'discard') { SELS = [a.c]; t = T('hThrow', cardTxt(a.c)); }
   renderGame(); toast('💡 ' + t, 5200);
@@ -2781,7 +2898,7 @@ function horResult(v) {
   closeAllOv();
   const res = v.res, s = v.seat;
   let h = '<h3>' + esc(res.winner == null ? T('rNoWinner') : (res.winner === s && G.mode !== 'two' ? T('youOut') : T('xOut', horName(v, res.winner)))) + '</h3>';
-  if (res.winner != null) h += '<div class="big">' + esc(horName(v, res.winner)) + ' ' + iso('+' + res.pts) + '</div>';
+  if (res.winner != null) h += '<div class="big" id="bigPts">' + esc(horName(v, res.winner)) + ' ' + iso('+' + res.pts) + '</div>';
   h += '<table class="tbl"><tr><th></th><th>' + esc(T('leftInHand')) + '</th><th>' + esc(T('total')) + '</th></tr>';
   for (let k = 0; k < v.n; k++) {
     const o = (s + k) % v.n, cards = v.hands ? v.hands[o] : [];
@@ -2792,10 +2909,14 @@ function horResult(v) {
   ov.querySelector('[data-x]').onclick = () => { G.resSeen = true; closeOv(ov); renderGame(); };
   ov.querySelector('[data-n]').onclick = () => { if (v.over) { closeOv(ov); horFinal(v); } else horNext(); };
   if (typeof renderReadyLine === 'function') renderReadyLine();
+  if (res.winner != null && !G.cheered) {
+    G.cheered = true; countUp($('#bigPts'), res.pts, '\u2068' + horName(v, res.winner) + '\u2069 ');
+    if (res.winner === s || G.mode === 'two') { celebrate(false); beep('win'); }
+  }
 }
 function horNext() {
   if (G.mode === 'online') { netReady(); return; }
-  closeAllOv(); G.resSeen = false; HOR.nextRound(G.M); NEWC = null; SELS = []; STAGE = [];
+  closeAllOv(); G.resSeen = false; G.cheered = false; HOR.nextRound(G.M); NEWC = null; SELS = []; STAGE = [];
   if (G.mode === 'two') PASS_ON = true;
   afterChange(true);
 }
@@ -2815,6 +2936,7 @@ function horFinal(v) {
   ov.querySelector('[data-h]').onclick = () => { closeOv(ov); leaveGame(); };
   ov.querySelector('[data-r]').onclick = () => { if (G.mode === 'online') { netReady(); return; } closeOv(ov); horRematch(); };
   if (typeof renderReadyLine === 'function') renderReadyLine();
+  if (won || G.mode === 'two') { celebrate(true); beep('win'); }
 }
 function horRematch() {
   const M0 = G.M;
@@ -2824,12 +2946,13 @@ function horRematch() {
   afterChange(true);
 }
 function bindHor() {
+  $('#bUndo').onclick = () => { if (!isHor()) return; const v = curView(); if (!v || !v.canUndo) return; STAGE = []; horDo({ a: 'undo' }); toast('↶ ' + T('undone')); };
   $('#hTable').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (b && isHor()) horTapMeld(+b.dataset.m); });
   $('#hStage').addEventListener('click', e => {
     if (!isHor()) return;
     const st = e.target.closest('[data-st]'); if (st) { STAGE.splice(+st.dataset.st, 1); renderGame(); return; }
     if (e.target.closest('#stCancel')) { STAGE = []; renderGame(); return; }
-    if (e.target.closest('#stOpen')) horDo({ a: 'open', melds: STAGE.map(m => m.slice()) });
+    if (e.target.closest('#stOpen')) horDo({ a: 'open', melds: STAGE.map(m => m.slice()), lows: STAGE.map(m => !!m.low) });
   });
 }
 
@@ -2883,7 +3006,7 @@ function horReplay(r) {
   const frames = [JSON.parse(JSON.stringify(M.R))];
   for (const e of r.log) {
     const [s, a] = e, act = { a };
-    if (a === 'take' || a === 'draw') {} else if (a === 'discard') act.c = e[2]; else if (a === 'open') act.melds = e[2]; else if (a === 'meld') act.cards = e[2]; else if (a === 'lay' || a === 'swap') { act.c = e[2]; act.m = e[3]; }
+    if (a === 'take' || a === 'draw') {} else if (a === 'discard') act.c = e[2]; else if (a === 'open') { act.melds = e[2]; if (e[3]) act.lows = e[3]; } else if (a === 'meld') { act.cards = e[2]; act.low = !!e[3]; } else if (a === 'lay' || a === 'swap') { act.c = e[2]; act.m = e[3]; if (a === 'lay' && e[4]) act.at = e[4]; }
     if (!HOR.apply(M, s, act)) break; frames.push(JSON.parse(JSON.stringify(M.R)));
   }
   let i = 0, auto = null;
@@ -2893,7 +3016,7 @@ function horReplay(r) {
   function draw() {
     const R = frames[i];
     $('#rpBody').innerHTML = R.hands.map((h, s) => '<div><b>' + esc(r.names[s] || '') + '</b><div class="hrow">' + srt(h).map(c => cardHTML(c)).join('') + '</div></div>').join('') +
-      '<div class="hrow" style="gap:6px">' + R.table.map(m => '<span style="display:inline-flex;gap:1px;padding:2px;border-radius:6px;background:rgba(0,0,0,.15)">' + m.cards.map(c => cardHTML(c, '', 'style="--w:22px"')).join('') + '</span>').join('') + '</div>' +
+      '<div class="hrow" style="gap:6px">' + R.table.map(m => '<span style="display:inline-flex;gap:1px;padding:2px;border-radius:6px;background:rgba(0,0,0,.15)">' + m.cards.map(c => jkCard(c, m.jr, 22)).join('') + '</span>').join('') + '</div>' +
       '<p style="text-align:center;min-height:40px">' + esc(i ? say(r.log[i - 1]) : T('dealt')) + (i === frames.length - 1 && R.res && R.res.winner != null ? ' — ' + esc(T('xOut', r.names[R.res.winner])) + ' +' + R.res.pts : '') + '</p><p class="muted" style="text-align:center">' + iso(i + ' / ' + (frames.length - 1)) + '</p>';
   }
   o.addEventListener('click', e => {
@@ -3073,7 +3196,7 @@ function netMsg(m, from) {
   if (m.type === 'view') {
     const prev = G.v, v = m.v; G.var = m.var || 'gin';
     const newHand = !prev || (prev.handNo || prev.roundNo) !== (v.handNo || v.roundNo) || G.mid !== m.mid;
-    if (newHand) { G.resSeen = false; SEL = null; SELS = []; STAGE = []; NEWC = null; closeAllOv(); G.readyMine = false; }
+    if (newHand) { G.resSeen = false; G.cheered = false; SEL = null; SELS = []; STAGE = []; NEWC = null; closeAllOv(); G.readyMine = false; }
     else if (v.hand.length > prev.hand.length && prev.turn === v.seat && prev.phase === 'draw' || (prev.phase === 'first' && v.hand.length > prev.hand.length)) NEWC = v.hand.find(c => !prev.hand.includes(c));
     else if (v.hand.length < prev.hand.length) NEWC = null;
     if (prev && v.log.length > prev.log.length && v.log[v.log.length - 1][0] !== v.seat) beep(['knock', 'open'].includes(v.log[v.log.length - 1][1]) ? 'knock' : 'card');
@@ -3113,7 +3236,7 @@ function waitingFor() {             // friends (online, not replaced by the comp
 function maybeAdvance(force) {
   if (!isHostOnline() || !G.M || rnd(G.M).phase !== 'end') return;
   if (!G.ready[0] || (waitingFor().length && !force)) return;
-  G.ready = G.ready.map(() => false); G.resSeen = false; NEWC = null; SEL = null; SELS = []; STAGE = []; closeAllOv();
+  G.ready = G.ready.map(() => false); G.resSeen = false; G.cheered = false; NEWC = null; SEL = null; SELS = []; STAGE = []; closeAllOv();
   if (G.M.over) {
     const M0 = G.M, names = G.map.map((ls, i) => ls == null ? '' : (i === 0 ? ST.name || T('player') : nameAt(ls) || M0.names[i]));
     G.M = isHor() ? HOR.newMatch({ players: M0.n, threshold: M0.threshold, jokers: M0.jokers, target: M0.target, aceHigh: M0.aceHigh, names, dealer: (M0.R.dealer + 1) % M0.n })
