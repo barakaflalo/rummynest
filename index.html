@@ -306,6 +306,7 @@ input.in,select.in{width:100%;min-height:48px;border-radius:12px;border:1.5px so
       <button class="mode main hide" id="mCont"><span class="ic">▶</span><span><b data-t="continue"></b><span id="mContSub"></span></span></button>
       <button class="mode" id="mCpu"><span class="ic">🤖</span><span><b data-t="vsCpu"></b><span data-t="vsCpuSub"></span></span></button>
       <button class="mode" id="mTwo"><span class="ic">👥</span><span><b data-t="twoPhone"></b><span data-t="twoPhoneSub"></span></span></button>
+      <button class="mode" id="mDaily"><span class="ic">📅</span><span><b data-t="daily"></b><span id="mDailySub"></span></span></button>
       <button class="mode" id="mOnline"><span class="ic">🌍</span><span><b data-t="online"></b><span data-t="onlineSub"></span></span></button>
     </div>
     <div class="minor">
@@ -1321,11 +1322,19 @@ const HOR = (() => {
     if (v.counts[nxt] <= 3) d += 2;
     return d * L.danger;
   }
+  /* personalities: a flavour on top of a level (measured so none is just weaker) */
+  const PERS = { careful: { delay: 3, keepJ: true }, bold: { takeGain: 2, keepJ: false, layP: 1 }, guard: { dangerX: 2.5, dump: true } };
+  function persLevel(level, p) {
+    if (!p || !PERS[p]) return level;
+    const k = level + '_' + p;
+    if (!LV[k]) { const b = LV[level] || LV[1], x = Object.assign({}, b, PERS[p]); if (x.dangerX) x.danger = (b.danger || .5) * x.dangerX; if (p === 'bold') x.takeGain = Math.min(b.takeGain, 2); LV[k] = x; }
+    return k;
+  }
   function act(v, level, rnd) {
     rnd = rnd || Math.random; const L = LV[level] || LV[1], s = v.seat, hand = v.hand, tp = v.discard[v.discard.length - 1];
     if (v.phase === 'draw') {
       if (tp == null) return { a: 'draw' };
-      if (isJ(tp) && level !== 0) return { a: 'take' };
+      if (isJ(tp) && L.noise < .3) return { a: 'take' };
       const now = plan(hand, v.aceHigh, 'dw'), w = plan(hand.concat([tp]), v.aceHigh, 'dw');
       const usedInMeld = w.melds.some(m => m.includes(tp));
       const fitsTable = v.opened[s] && v.table.some(m => fitLay(m, tp, v.aceHigh));
@@ -1334,7 +1343,7 @@ const HOR = (() => {
       if ((usedInMeld || fitsTable) && gain >= L.takeGain) return { a: 'take' };
       if (!v.opened[s] && usedInMeld) {               // would it let me open now?
         const o0 = plan(hand, v.aceHigh, 'open').v, o1 = plan(hand.concat([tp]), v.aceHigh, 'open').v;
-        if (o1 >= v.threshold && o0 < v.threshold && level !== 0) return { a: 'take' };
+        if (o1 >= v.threshold && o0 < v.threshold && L.noise < .3) return { a: 'take' };
       }
       return { a: 'draw' };
     }
@@ -1342,7 +1351,9 @@ const HOR = (() => {
     // 1) open
     if (!v.opened[s]) {
       const o = plan(hand, v.aceHigh, 'open');
-      if (o.v >= v.threshold) {
+      const nobodyOpen = !v.opened.some((x, i) => i !== s && x);
+      const hold = L.delay && nobodyOpen && v.turns < L.delay * v.n && o.v < v.threshold + 15 && hand.length > 6;
+      if (o.v >= v.threshold && !hold) {
         return { a: 'open', melds: o.melds.slice() };
       }
     } else {
@@ -1411,7 +1422,7 @@ const HOR = (() => {
     if (L.noise && rnd() < L.noise) return { a: 'discard', c: scored[Math.floor(rnd() * Math.min(3, scored.length))].c };
     return { a: 'discard', c: scored[0].c };
   }
-  return { newMatch, deal, nextRound, legal, apply, view, act, plan, validMeld, fitLay, layEnds, swapFit, isJ, pen, LV, DEF };
+  return { newMatch, deal, nextRound, legal, apply, view, act, persLevel, PERS, plan, validMeld, fitLay, layEnds, swapFit, isJ, pen, LV, DEF };
 })();
 
 
@@ -1823,6 +1834,34 @@ rulesHtml:"<h3>الهدف</h3><p>لاعبان. رتّب أوراقك العشر 
 
 /* ---- i18n/hor_he.js ---- */
 Object.assign(LANG.he, {
+daily:"אתגר יומי",
+dNotYet:"אותו ערבוב לכולם היום — עוד לא שיחקת",
+dDoneWin:"היום: ✅ ניצחת ב-{0} תורות",
+dDoneLose:"היום: ❌ — אפשר לנסות שוב (לא נספר)",
+dWin:"ניצחת באתגר היומי!",
+dLose:"הפעם המחשב סיים ראשון",
+dTurns:"התורות שלך",
+dStreak:"רצף ניצחונות",
+dOfficial:"זה הניסיון הרשמי של היום",
+dRetry:"ניסיון חוזר — רק הראשון נספר",
+dFirst:"הניסיון הראשון: {0} ב-{1} תורות",
+dShare:"שתף",
+dShareWin:"🏁 ניצחתי ב-{0} תורות (+{1})",
+dShareLose:"❌ הפסדתי אחרי {0} תורות — נראה אותך 😉",
+p_careful:"🐢 רותי הזהירה",
+p_bold:"🔥 בני התוקפן",
+p_guard:"🛡️ שמעון השומר",
+persLbl:"אופי המחשבים",
+pp_mix:"מעורב",
+pp_careful:"🐢",
+pp_bold:"🔥",
+pp_guard:"🛡️",
+pp_none:"רגיל",
+pd_mix:"כל מחשב עם אופי אחר.",
+pd_careful:"🐢 רותי לא ממהרת להוריד — מחכה ליד חזקה ושומרת ג'וקרים.",
+pd_bold:"🔥 בני מוריד מהר ולוקח הרבה מהערימה.",
+pd_guard:"🛡️ שמעון לא זורק קלפים שעוזרים לך.",
+pd_none:"מחשב רגיל, בלי אופי.",
 undone:"בוטל — חזרת לתחילת התור",
 canLayN:"{0} מהקלפים שלך נכנסים לשולחן (מסומנים בירוק) · חוסך {1} נקודות",
 savesN:"חוסך {0} נקודות",
@@ -1852,6 +1891,34 @@ rulesHorHtml:"<h2>רמי הורדות</h2><h3>הכנה</h3><p>2–4 שחקנים
 
 /* ---- i18n/hor_en.js ---- */
 Object.assign(LANG.en, {
+daily:"Daily challenge",
+dNotYet:"Same deal for everyone today — not played yet",
+dDoneWin:"Today: ✅ won in {0} turns",
+dDoneLose:"Today: ❌ — try again (won't count)",
+dWin:"You beat the daily challenge!",
+dLose:"The computer went out first this time",
+dTurns:"Your turns",
+dStreak:"Win streak",
+dOfficial:"This is today's official attempt",
+dRetry:"A retry — only the first one counts",
+dFirst:"First attempt: {0} in {1} turns",
+dShare:"Share",
+dShareWin:"🏁 I won in {0} turns (+{1})",
+dShareLose:"❌ I lost after {0} turns — your turn 😉",
+p_careful:"🐢 Ruth the Careful",
+p_bold:"🔥 Ben the Bold",
+p_guard:"🛡️ Simon the Guard",
+persLbl:"Computer personalities",
+pp_mix:"Mixed",
+pp_careful:"🐢",
+pp_bold:"🔥",
+pp_guard:"🛡️",
+pp_none:"Plain",
+pd_mix:"Each computer gets a different personality.",
+pd_careful:"🐢 Ruth is in no hurry to open — waits for a strong hand and keeps jokers.",
+pd_bold:"🔥 Ben opens fast and takes a lot from the pile.",
+pd_guard:"🛡️ Simon never throws cards that help you.",
+pd_none:"A plain computer, no personality.",
 undone:"Undone — back to the start of your turn",
 canLayN:"{0} of your cards fit the table (green dot) · saves {1} points",
 savesN:"saves {0} points",
@@ -1881,6 +1948,34 @@ rulesHorHtml:"<h2>Rummy with a first meld</h2><h3>Setup</h3><p>2–4 players, tw
 
 /* ---- i18n/hor_ru.js ---- */
 Object.assign(LANG.ru, {
+daily:"Задание дня",
+dNotYet:"Сегодня у всех одинаковая раздача — вы ещё не играли",
+dDoneWin:"Сегодня: ✅ победа за {0} ходов",
+dDoneLose:"Сегодня: ❌ — можно ещё раз (не засчитается)",
+dWin:"Задание дня пройдено!",
+dLose:"На этот раз компьютер вышел первым",
+dTurns:"Ваших ходов",
+dStreak:"Серия побед",
+dOfficial:"Это официальная попытка дня",
+dRetry:"Повтор — засчитывается только первая",
+dFirst:"Первая попытка: {0} за {1} ходов",
+dShare:"Поделиться",
+dShareWin:"🏁 Я выиграл за {0} ходов (+{1})",
+dShareLose:"❌ Проиграл после {0} ходов — твоя очередь 😉",
+p_careful:"🐢 Осторожная Рут",
+p_bold:"🔥 Смелый Бен",
+p_guard:"🛡️ Страж Семён",
+persLbl:"Характер компьютеров",
+pp_mix:"Разные",
+pp_careful:"🐢",
+pp_bold:"🔥",
+pp_guard:"🛡️",
+pp_none:"Обычный",
+pd_mix:"У каждого компьютера свой характер.",
+pd_careful:"🐢 Рут не спешит выкладывать — ждёт сильную руку и бережёт джокеров.",
+pd_bold:"🔥 Бен выкладывает быстро и часто берёт из сброса.",
+pd_guard:"🛡️ Семён не сбрасывает карты, которые вам помогут.",
+pd_none:"Обычный компьютер без характера.",
 undone:"Отменено — вы в начале хода",
 canLayN:"{0} ваших карт подходят к столу (зелёная точка) · экономия {1} очков",
 savesN:"экономия {0} очков",
@@ -1905,6 +2000,34 @@ rulesHorHtml:"<h2>Рамми с первой выкладкой</h2><h3>Подг
 
 /* ---- i18n/hor_es.js ---- */
 Object.assign(LANG.es, {
+daily:"Reto diario",
+dNotYet:"Hoy el mismo reparto para todos — aún no has jugado",
+dDoneWin:"Hoy: ✅ ganaste en {0} turnos",
+dDoneLose:"Hoy: ❌ — puedes repetir (no cuenta)",
+dWin:"¡Superaste el reto diario!",
+dLose:"Esta vez el ordenador cerró primero",
+dTurns:"Tus turnos",
+dStreak:"Racha de victorias",
+dOfficial:"Este es el intento oficial de hoy",
+dRetry:"Repetición: solo cuenta el primero",
+dFirst:"Primer intento: {0} en {1} turnos",
+dShare:"Compartir",
+dShareWin:"🏁 Gané en {0} turnos (+{1})",
+dShareLose:"❌ Perdí tras {0} turnos — te toca 😉",
+p_careful:"🐢 Rut la Prudente",
+p_bold:"🔥 Beni el Atrevido",
+p_guard:"🛡️ Simón el Guardián",
+persLbl:"Carácter del ordenador",
+pp_mix:"Mixto",
+pp_careful:"🐢",
+pp_bold:"🔥",
+pp_guard:"🛡️",
+pp_none:"Normal",
+pd_mix:"Cada ordenador con un carácter distinto.",
+pd_careful:"🐢 Rut no tiene prisa por bajar: espera una mano fuerte y guarda comodines.",
+pd_bold:"🔥 Beni baja rápido y coge mucho del descarte.",
+pd_guard:"🛡️ Simón nunca descarta cartas que te ayuden.",
+pd_none:"Ordenador normal, sin carácter.",
 undone:"Deshecho: vuelves al inicio del turno",
 canLayN:"{0} de tus cartas encajan en la mesa (punto verde) · ahorras {1} puntos",
 savesN:"ahorras {0} puntos",
@@ -1929,6 +2052,34 @@ rulesHorHtml:"<h2>Rummy con primera bajada</h2><h3>Preparación</h3><p>2–4 jug
 
 /* ---- i18n/hor_ar.js ---- */
 Object.assign(LANG.ar, {
+daily:"تحدي اليوم",
+dNotYet:"التوزيع نفسه للجميع اليوم — لم تلعب بعد",
+dDoneWin:"اليوم: ✅ فزت في {0} أدوار",
+dDoneLose:"اليوم: ❌ — يمكنك المحاولة مجددًا (لن تُحتسب)",
+dWin:"فزت بتحدي اليوم!",
+dLose:"هذه المرة أنهى الكمبيوتر أولًا",
+dTurns:"أدوارك",
+dStreak:"سلسلة الفوز",
+dOfficial:"هذه هي المحاولة الرسمية لليوم",
+dRetry:"إعادة — تُحتسب الأولى فقط",
+dFirst:"المحاولة الأولى: {0} في {1} أدوار",
+dShare:"مشاركة",
+dShareWin:"🏁 فزت في {0} أدوار (+{1})",
+dShareLose:"❌ خسرت بعد {0} أدوار — دورك 😉",
+p_careful:"🐢 روث الحذرة",
+p_bold:"🔥 بِني الجريء",
+p_guard:"🛡️ سمعان الحارس",
+persLbl:"شخصية الكمبيوتر",
+pp_mix:"مختلط",
+pp_careful:"🐢",
+pp_bold:"🔥",
+pp_guard:"🛡️",
+pp_none:"عادي",
+pd_mix:"لكل كمبيوتر شخصية مختلفة.",
+pd_careful:"🐢 روث لا تستعجل التنزيل — تنتظر يدًا قوية وتحتفظ بالجوكر.",
+pd_bold:"🔥 بِني ينزّل بسرعة ويأخذ كثيرًا من المرمى.",
+pd_guard:"🛡️ سمعان لا يرمي أوراقًا تساعدك.",
+pd_none:"كمبيوتر عادي بلا شخصية.",
 undone:"تم التراجع — عدت إلى بداية دورك",
 canLayN:"{0} من أوراقك تناسب الطاولة (نقطة خضراء) · توفر {1} نقاط",
 savesN:"توفر {0} نقاط",
@@ -1955,7 +2106,7 @@ rulesHorHtml:"<h2>رامي بتنزيل أول</h2><h3>التحضير</h3><p>2�
 /* =====================================================================
    RummyNest — app core (storage · settings · screens · cards · sound)
    ===================================================================== */
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const $ = s => document.querySelector(s), $$ = s => Array.from(document.querySelectorAll(s));
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const P = 'rummy_';
@@ -2239,7 +2390,7 @@ function aiSeat() {
   if (isHostOnline() && G.subs && G.subs[t]) return t;
   return null;
 }
-const aiLevel = s => G.bots && G.bots[s] != null ? G.bots[s] : (G.mode === 'cpu' ? G.level : 2);
+const aiLevel = s => G.bots && G.bots[s] != null ? (G.pers && G.pers[s] && typeof HOR !== 'undefined' && isHor() ? HOR.persLevel(G.bots[s], G.pers[s]) : G.bots[s]) : (G.mode === 'cpu' ? G.level : 2);
 function scheduleAI() {
   clearTimeout(aiT);
   const s = aiSeat(); if (s == null) return;
@@ -2665,18 +2816,23 @@ function bindGame() {
 let SELS = [], STAGE = [];                    // selected cards · melds staged for the opening
 const isHor = () => G && G.var === 'hor';
 
+const PERS_ORDER = ['careful', 'bold', 'guard'];
 function startHor(o) {
-  const n = o.players, M = HOR.newMatch({ players: n, threshold: ST.horThr, jokers: ST.horJokers, aceHigh: ST.horAceHigh, target: ST.horTarget,
-    names: o.names || Array(n).fill(''), dealer: Math.floor(Math.random() * n) });
-  const bots = {}; if (o.mode === 'cpu') for (let s = 1; s < n; s++) bots[s] = o.level;
-  G = { var: 'hor', mode: o.mode, level: o.level, bots, M, id: Date.now(), hints: 0, counted: {} };
+  const n = o.players, R0 = o.rules || { threshold: ST.horThr, jokers: ST.horJokers, aceHigh: ST.horAceHigh, target: ST.horTarget };
+  const M = HOR.newMatch(Object.assign({ players: n, names: o.names || Array(n).fill(''), dealer: o.dealer != null ? o.dealer : Math.floor(Math.random() * n), seed: o.seed }, R0));
+  const bots = {}, pers = {};
+  if (o.mode === 'cpu' || o.mode === 'daily') {
+    const pick = o.pers || ST.horPers || 'mix', mix = PERS_ORDER.slice().sort(() => Math.random() - .5);
+    for (let s = 1; s < n; s++) { bots[s] = o.level; const ps = pick === 'mix' ? mix[(s - 1) % 3] : pick; if (ps !== 'none') pers[s] = ps; }
+  }
+  G = { var: 'hor', mode: o.mode, level: o.level, bots, pers, M, id: Date.now(), hints: 0, counted: {}, daily: o.daily || null };
   SELS = []; STAGE = []; NEWC = null; saveGame(); show('game'); if (o.mode === 'two') PASS_ON = true; afterChange(true);
 }
 const SEATC = ['#e8b931', '#4aa8e8', '#e0566a', '#3fbf7f'];
-const horShort = (v, s) => G && G.bots && G.bots[s] != null ? T('computer') + (v.n > 2 ? ' ' + s : '') : horName(v, s);
+const horShort = (v, s) => G && G.bots && G.bots[s] != null ? (G.pers && G.pers[s] ? T('p_' + G.pers[s]) : T('computer') + (v.n > 2 ? ' ' + s : '')) : horName(v, s);
 function horName(v, s) {
   if (v.names && v.names[s]) return v.names[s];
-  if (G && G.bots && G.bots[s] != null) return T('computer') + (v.n > 2 ? ' ' + s : '') + ' · ' + T(LVL[G.bots[s]]);
+  if (G && G.bots && G.bots[s] != null) return (G.pers && G.pers[s] ? T('p_' + G.pers[s]) : T('computer') + (v.n > 2 ? ' ' + s : '')) + ' · ' + T(LVL[G.bots[s]]);
   return s === v.seat ? (ST.name || T('you')) : T('player') + ' ' + (s + 1);
 }
 
@@ -2895,6 +3051,7 @@ function horHint() {
 
 /* ---------- round end / match end ---------- */
 function horResult(v) {
+  if (G.mode === 'daily') return dailyResult(v);
   closeAllOv();
   const res = v.res, s = v.seat;
   let h = '<h3>' + esc(res.winner == null ? T('rNoWinner') : (res.winner === s && G.mode !== 'two' ? T('youOut') : T('xOut', horName(v, res.winner)))) + '</h3>';
@@ -2960,7 +3117,7 @@ function bindHor() {
 function horSetup(mode) {
   const n0 = LS.get('horN', 2);
   let h = '<h3>' + esc(T('hor')) + ' · ' + esc(mode === 'cpu' ? T('vsCpu') : T('twoPhone')) + '</h3><label class="f">' + esc(T('players')) + '</label><div class="seg" id="hsN">' + [2, 3, 4].map(n => '<button data-v="' + n + '" class="' + (n === n0 ? 'on' : '') + '">' + n + '</button>').join('') + '</div>';
-  if (mode === 'cpu') h += '<label class="f">' + esc(T('chooseLevel')) + '</label><div class="lvls" id="hsL"></div><p class="muted" id="hsNote"></p>';
+  if (mode === 'cpu') h += '<label class="f">' + esc(T('chooseLevel')) + '</label><div class="lvls" id="hsL"></div><p class="muted" id="hsNote"></p><label class="f">' + esc(T('persLbl')) + '</label><div class="seg" id="hsP">' + ['mix', 'careful', 'bold', 'guard', 'none'].map(k => '<button data-p="' + k + '" class="' + ((ST.horPers || 'mix') === k ? 'on' : '') + '">' + esc(T('pp_' + k)) + '</button>').join('') + '</div><p class="muted" id="hsPN">' + esc(T('pd_' + (ST.horPers || 'mix'))) + '</p>';
   else h += '<div id="hsNames"></div>';
   h += '<p class="muted" style="margin:8px 0 0">' + esc(T('openN', ST.horThr) + ' · ' + T('toN', ST.horTarget) + ' · ' + T('jokersN', ST.horJokers)) + ' · <a href="#" id="qrSet" style="color:var(--acc)">' + esc(T('change')) + '</a></p><div class="row" style="margin-top:12px"><button class="btn ghosty" data-c>' + esc(T('cancel')) + '</button><button class="btn main" data-g>' + esc(T('startGame')) + '</button></div>';
   const o = overlay(h); let n = n0, lvl = Math.min(ST.level, 3);
@@ -2979,6 +3136,7 @@ function horSetup(mode) {
     const nb = e.target.closest('#hsN [data-v]'); if (nb) { n = +nb.dataset.v; $$('#hsN button').forEach(b => b.classList.toggle('on', b === nb)); draw(); return; }
     const lb = e.target.closest('[data-l]'); if (lb) { lvl = +lb.dataset.l; draw(); return; }
     if (e.target.closest('[data-c]')) { closeOv(o); return; }
+    const pb = e.target.closest('#hsP [data-p]'); if (pb) { ST.horPers = pb.dataset.p; saveST(); $$('#hsP button').forEach(x => x.classList.toggle('on', x === pb)); $('#hsPN').textContent = T('pd_' + pb.dataset.p); return; }
     if (e.target.closest('[data-g]')) {
       LS.set('horN', n);
       if (mode === 'cpu') { ST.level = lvl; saveST(); closeOv(o); startHor({ mode, players: n, level: lvl }); }
@@ -2989,6 +3147,11 @@ function horSetup(mode) {
 
 function horHandEnd() {
   const M = G.M, R = M.R, res = R.res; G.counted[G.id + ':' + M.roundNo] = 1;
+  if (G.mode === 'daily') {
+    M.over = true; M.winner = res.winner;
+    const D = LS.get('daily', {}), k = G.daily && G.daily.key;
+    if (k && G.daily.official && !D[k]) { D[k] = { win: res.winner === 0, turns: myTurns(R.log), pts: res.winner === 0 ? res.pts : -res.left[0], hints: G.hints || 0 }; LS.set('daily', D); }
+  }
   const me = G.mode === 'two' ? null : mySeat();
   beep(res.winner === me || me == null ? 'gin' : 'knock');
   const S = LS.get('stats', {}), k = 'hor_' + (G.mode === 'cpu' ? 'cpu' + G.level : G.mode);
@@ -3341,6 +3504,37 @@ let RULES_BACK = 'home';
 /* the rummy family — only variants whose engine is finished are listed */
 const VARIANTS = [{ id: 'gin', name: 'gin', sub: 'ginSub' }, { id: 'hor', name: 'hor', sub: 'horSub' }];
 
+function dayKey(d) { d = d || new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function daySeed(k) { let h = 2166136261; for (const ch of 'rummynest-daily-' + k) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function dailyStreak() {
+  const D = LS.get('daily', {}); let n = 0, d = new Date();
+  if (!D[dayKey(d)] || !D[dayKey(d)].win) d.setDate(d.getDate() - 1);
+  while (D[dayKey(d)] && D[dayKey(d)].win) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+function startDaily() {
+  const k = dayKey(), D = LS.get('daily', {});
+  const go = () => startHor({ mode: 'daily', players: 2, level: 2, pers: 'guard', seed: daySeed(k), dealer: 1, rules: { threshold: 30, jokers: 2, aceHigh: true, target: 1 }, daily: { key: k, official: !D[k] } });
+  if (G && G.M && !G.M.over && G.mode !== 'online' && G.mode !== 'daily') confirmBox(T('replaceQ'), T('newGame'), go); else go();
+}
+function myTurns(log) { return log.filter(e => e[0] === 0 && (e[1] === 'draw' || e[1] === 'take')).length; }
+function dailyResult(v) {
+  closeAllOv();
+  const d = G.daily || {}, D = LS.get('daily', {}), rec = D[d.key] || {}, res = v.res, won = res.winner === 0;
+  const turns = myTurns(v.log), pts = won ? res.pts : -res.left[0], streak = dailyStreak();
+  const ov = overlay('<div style="font-size:54px;text-align:center">' + (won ? '🏆' : '📅') + '</div><h3 style="text-align:center">' + esc(won ? T('dWin') : res.winner == null ? T('rNoWinner') : T('dLose')) + '</h3>' +
+    '<table class="tbl"><tr><td>' + esc(T('dTurns')) + '</td><td>' + turns + '</td></tr><tr><td>' + esc(T('points')) + '</td><td>' + iso((pts > 0 ? '+' : '') + pts) + '</td></tr>' + (G.hints ? '<tr><td>' + esc(T('hintsUsed', '')) + '</td><td>' + G.hints + '</td></tr>' : '') + '<tr><td>' + esc(T('dStreak')) + '</td><td>🔥 ' + streak + '</td></tr></table>' +
+    '<p class="muted" style="text-align:center">' + esc(d.official ? T('dOfficial') : T('dRetry')) + (rec.turns != null && !d.official ? ' · ' + esc(T('dFirst', rec.win ? '✅' : '❌', rec.turns)) : '') + '</p>' +
+    '<div class="row"><button class="btn" data-h>' + esc(T('home')) + '</button><button class="btn" data-t>👀 ' + esc(T('viewTable')) + '</button><button class="btn main" data-s>💬 ' + esc(T('dShare')) + '</button></div>', 'center');
+  ov.querySelector('[data-h]').onclick = () => { closeOv(ov); leaveGame(); };
+  ov.querySelector('[data-t]').onclick = () => { G.resSeen = true; closeOv(ov); renderGame(); };
+  ov.querySelector('[data-s]').onclick = () => {
+    const r = D[d.key] || { win: won, turns, pts }, [y, m, dd] = d.key.split('-');
+    const txt = 'RummyNest · ' + T('daily') + ' ' + dd + '/' + m + '\n' + (r.win ? T('dShareWin', r.turns, r.pts) : T('dShareLose', r.turns)) + (streak > 1 ? '\n🔥 ' + T('dStreak') + ': ' + streak : '') + '\n' + location.origin + location.pathname;
+    window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+  };
+  if (won) { celebrate(true); beep('win'); } else beep('lose');
+}
 function renderHome() {
   applyLang();
   $('#verLbl').textContent = 'v' + APP_VERSION;
@@ -3348,9 +3542,11 @@ function renderHome() {
   $('#heroFan').innerHTML = fan;
   $('#vgrid').innerHTML = VARIANTS.map(x => '<button class="vcard ' + (ST.variant === x.id ? 'on' : '') + '" data-v="' + x.id + '"><b>' + esc(T(x.name)) + '</b><span>' + esc(T(x.sub)) + '</span></button>').join('');
   const c = $('#mCont'), g = G;
+  const dk = dayKey(), rec = LS.get('daily', {})[dk], st = dailyStreak();
+  $('#mDailySub').textContent = (rec ? (rec.win ? T('dDoneWin', rec.turns) : T('dDoneLose')) : T('dNotYet')) + (st ? ' · 🔥 ' + st : '');
   if (g && ((g.M && !g.M.over) || g.mode === 'online')) {
     c.classList.remove('hide');
-    $('#mContSub').textContent = (g.var === 'hor' ? T('hor') : T('gin')) + ' · ' + (g.mode === 'online' ? T('online') + (LINK && LINK.session ? ' · ' + LINK.session.code : '') : g.mode === 'two' ? T('twoPhone') : T('vsCpu') + ' · ' + T(LVL[g.level]));
+    $('#mContSub').textContent = (g.var === 'hor' ? T('hor') : T('gin')) + ' · ' + (g.mode === 'online' ? T('online') + (LINK && LINK.session ? ' · ' + LINK.session.code : '') : g.mode === 'two' ? T('twoPhone') : g.mode === 'daily' ? T('daily') : T('vsCpu') + ' · ' + T(LVL[g.level]));
   } else c.classList.add('hide');
 }
 function chooseLevel() {
@@ -3500,6 +3696,7 @@ function init() {
   $('#hReplays').onclick = () => { renderReplays(); show('replays'); };
   $('#hSettings').onclick = () => { renderSettings(); show('settings'); };
   $('#vgrid').onclick = e => { const b = e.target.closest('[data-v]'); if (b) { ST.variant = b.dataset.v; saveST(); renderHome(); } };
+  $('#mDaily').onclick = () => { if (G && G.mode === 'daily' && G.M && !G.M.over && G.daily && G.daily.key === dayKey()) { show('game'); afterChange(); return; } startDaily(); };
   $('#mCpu').onclick = () => ST.variant === 'hor' ? horSetup('cpu') : chooseLevel();
   $('#mTwo').onclick = () => ST.variant === 'hor' ? horSetup('two') : askTwo();
   $('#mOnline').onclick = () => { if (G && G.mode === 'online') { show(G.M || G.v ? 'game' : 'lobby'); if (!G.M && !G.v) renderLobby(); } else openOnline(); };
